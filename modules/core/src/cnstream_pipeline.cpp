@@ -18,11 +18,18 @@
  * THE SOFTWARE.
  *************************************************************************/
 
+#include <rapidjson/document.h>
+#include <rapidjson/rapidjson.h>
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/writer.h>
+
 #include <algorithm>
 #include <chrono>
+#include <fstream>
 #include <map>
 #include <memory>
 #include <set>
+#include <string>
 #include <thread>
 #include <unordered_map>
 #include <vector>
@@ -36,13 +43,100 @@
 
 namespace cnstream {
 
+void CNModuleConfig::ParseByJSONStr(const std::string& jstr) {
+  rapidjson::Document doc;
+  if (doc.Parse(jstr.c_str()).HasParseError()) {
+    throw "Parse module configuration failed. Error code [" + std::to_string(doc.GetParseError()) + "]" + " Offset [" +
+        std::to_string(doc.GetErrorOffset()) + "]. JSON:" + jstr;
+  }
+
+  /* get members */
+  const auto end = doc.MemberEnd();
+
+  // className
+  if (end == doc.FindMember("class_name")) {
+    throw std::string("Module has to have a class_name.");
+  } else {
+    if (!doc["class_name"].IsString()) throw std::string("class_name must be string type.");
+    this->className = doc["class_name"].GetString();
+  }
+
+  // parallelism
+  if (end != doc.FindMember("parallelism")) {
+    if (!doc["parallelism"].IsUint()) throw std::string("parallelism must be uint type.");
+    this->parallelism = doc["parallelism"].GetUint();
+  } else {
+    this->parallelism = 1;
+  }
+
+  // maxInputQueueSize
+  if (end != doc.FindMember("max_input_queue_size")) {
+    if (!doc["max_input_queue_size"].IsUint()) throw std::string("max_input_queue_size must be uint type.");
+    this->maxInputQueueSize = doc["max_input_queue_size"].GetUint();
+  } else {
+    this->maxInputQueueSize = 20;
+  }
+
+  // next
+  if (end != doc.FindMember("next_modules")) {
+    if (!doc["next_modules"].IsArray()) {
+      throw std::string("next_modules must be array type.");
+    }
+    auto values = doc["next_modules"].GetArray();
+    for (auto iter = values.begin(); iter != values.end(); ++iter) {
+      if (!iter->IsString()) {
+        throw std::string("next_modules must be an array of strings.");
+      }
+      this->next.push_back(iter->GetString());
+    }
+  } else {
+    this->next = {};
+  }
+
+  // custom parameters
+  if (end != doc.FindMember("custom_params")) {
+    rapidjson::Value& custom_params = doc["custom_params"];
+    if (!custom_params.IsObject()) {
+      throw std::string("custom_params must be an object.");
+    }
+    this->parameters.clear();
+    for (auto iter = custom_params.MemberBegin(); iter != custom_params.MemberEnd(); ++iter) {
+      std::string value;
+      if (!iter->value.IsString()) {
+        rapidjson::StringBuffer sbuf;
+        rapidjson::Writer<rapidjson::StringBuffer> jwriter(sbuf);
+        iter->value.Accept(jwriter);
+        value = sbuf.GetString();
+      } else {
+        value = iter->value.GetString();
+      }
+      this->parameters.insert(std::make_pair(iter->name.GetString(), value));
+    }
+  } else {
+    this->parameters = {};
+  }
+}
+
+void CNModuleConfig::ParseByJSONFile(const std::string& jfname) {
+  std::ifstream ifs(jfname);
+
+  if (!ifs.is_open()) {
+    throw "File open failed :" + jfname;
+  }
+
+  std::string jstr((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+  ifs.close();
+
+  ParseByJSONStr(jstr);
+}
+
 struct ModuleAssociatedInfo {
   std::shared_ptr<Module> instance;
   uint32_t parallelism = 0;
   std::vector<CNTimer> timers_;
   std::set<int64_t> down_nodes;
-  std::vector<int> input_connectors;
-  std::vector<int> output_connectors;
+  std::vector<std::string> input_connectors;
+  std::vector<std::string> output_connectors;
 };
 
 StreamMsgObserver::~StreamMsgObserver() {}
@@ -58,8 +152,6 @@ class PipelinePrivate {
     exit_msg_loop_ = true;
     if (smsg_thread_.joinable()) smsg_thread_.join();
   }
-  Pipeline* q_ptr_;
-  std::vector<std::shared_ptr<Connector>> connectors_;
   std::unordered_map<std::string, std::shared_ptr<Connector>> links_;
   std::vector<std::thread> threads_;
   std::thread event_thread_;
@@ -210,14 +302,6 @@ bool Pipeline::AddModule(std::shared_ptr<Module> module) {
   return true;
 }
 
-bool Pipeline::AddModule(std::vector<std::shared_ptr<Module>> modules) {
-  bool ret = true;
-  for (auto module : modules) {
-    ret &= AddModule(module);
-  }
-  return ret;
-}
-
 bool Pipeline::SetModuleParallelism(std::shared_ptr<Module> module, uint32_t parallelism) {
   int64_t hashcode = reinterpret_cast<int64_t>(module.get());
   if (d_ptr_->modules_.find(hashcode) == d_ptr_->modules_.end()) return false;
@@ -245,20 +329,19 @@ std::string Pipeline::LinkModules(std::shared_ptr<Module> up_node, std::shared_p
   ModuleAssociatedInfo& up_node_info = d_ptr_->modules_.find(up_node_hashcode)->second;
   ModuleAssociatedInfo& down_node_info = d_ptr_->modules_.find(down_node_hashcode)->second;
 
+  std::string link_id = up_node->GetName() + "-->" + down_node->GetName();
   auto ret = up_node_info.down_nodes.insert(down_node_hashcode);
   if (!ret.second) {
     LOG(ERROR) << "modules have been linked already";
-    return "";
+    return link_id;
   }
 
-  LOG(INFO) << "Link Module " << up_node->GetName() << "-->" << down_node->GetName();
+  LOG(INFO) << "Link Module " << link_id;
 
-  std::string link_id = up_node->GetName() + "-->" + down_node->GetName();
   // create connector
   std::shared_ptr<Connector> con = std::make_shared<Connector>(down_node_info.parallelism, queue_capacity);
-  d_ptr_->connectors_.push_back(con);
-  up_node_info.output_connectors.push_back(static_cast<int>(d_ptr_->connectors_.size() - 1));
-  down_node_info.input_connectors.push_back(static_cast<int>(d_ptr_->connectors_.size() - 1));
+  up_node_info.output_connectors.push_back(link_id);
+  down_node_info.input_connectors.push_back(link_id);
   d_ptr_->links_[link_id] = con;
 
   down_node->SetParentId(up_node->GetId());
@@ -309,8 +392,8 @@ bool Pipeline::Start() {
   event_bus_->running_ = true;
   d_ptr_->event_thread_ = std::thread(&Pipeline::EventLoop, this);
 
-  for (std::shared_ptr<Connector> connector : d_ptr_->connectors_) {
-    connector->Start();
+  for (std::pair<std::string, std::shared_ptr<Connector>> connector : d_ptr_->links_) {
+    connector.second->Start();
   }
 
   // create process threads
@@ -333,8 +416,8 @@ bool Pipeline::Stop() {
   if (!IsRunning()) return true;
 
   // stop data transmit
-  for (std::shared_ptr<Connector>& connector : d_ptr_->connectors_) {
-    connector->Stop();
+  for (std::pair<std::string, std::shared_ptr<Connector>> connector : d_ptr_->links_) {
+    connector.second->Stop();
   }
   running_ = false;
   event_bus_->running_ = false;
@@ -438,9 +521,9 @@ void Pipeline::TransmitData(int64_t node_hashcode, std::shared_ptr<CNFrameInfo> 
   }
 
   // broadcast
-  const std::vector<int>& connector_idxs = module_info.output_connectors;
-  for (auto& idx : connector_idxs) {
-    std::shared_ptr<Connector>& connector = d_ptr_->connectors_[idx];
+  const std::vector<std::string>& connector_ids = module_info.output_connectors;
+  for (auto& id : connector_ids) {
+    std::shared_ptr<Connector>& connector = d_ptr_->links_[id];
     int conveyor_idx = chn_idx % connector->GetConveyorCount();
     connector->PushDataBufferToConveyor(conveyor_idx, data);
   }
@@ -457,7 +540,7 @@ void Pipeline::TaskLoop(int64_t node_hashcode, uint32_t conveyor_idx) {
   std::vector<std::shared_ptr<Connector>> input_connectors;
   std::transform(module_info.input_connectors.begin(), module_info.input_connectors.end(),
                  std::back_inserter(input_connectors),
-                 [&](int idx) -> std::shared_ptr<Connector> { return d_ptr_->connectors_[idx]; });
+                 [&](std::string idx) -> std::shared_ptr<Connector> { return d_ptr_->links_[idx]; });
 
   if (input_connectors.size() == 0) return;
 
@@ -559,7 +642,7 @@ CNModuleConfig Pipeline::GetModuleConfig(const std::string& module_name) {
   return config;
 }
 
-int Pipeline::BuildPipeine(const std::vector<CNModuleConfig> configs) {
+int Pipeline::BuildPipeline(const std::vector<CNModuleConfig>& configs) {
   /*TODO,check configs*/
   ModuleCreatorWorker creator;
   std::map<std::string, int> queues_size;
@@ -574,10 +657,47 @@ int Pipeline::BuildPipeine(const std::vector<CNModuleConfig> configs) {
   }
   for (auto& v : d_ptr_->connections_config_) {
     for (auto& name : v.second) {
-      this->LinkModules(d_ptr_->modules_map_[v.first], d_ptr_->modules_map_[name], queues_size[name]);
+      if (this->LinkModules(d_ptr_->modules_map_[v.first], d_ptr_->modules_map_[name], queues_size[name]).empty()) {
+        LOG(ERROR) << "Link [" << v.first << "] with [" << name << "] failed.";
+        return -1;
+      }
     }
   }
   return 0;
+}
+
+int Pipeline::BuildPipelineByJSONFile(const std::string& config_file) {
+  std::ifstream ifs(config_file);
+  if (!ifs.is_open()) {
+    throw "Open file filed: " + config_file;
+  }
+
+  std::string jstr((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+  ifs.close();
+
+  /* traversing modules */
+  std::vector<CNModuleConfig> mconfs;
+  rapidjson::Document doc;
+  if (doc.Parse(jstr.c_str()).HasParseError()) {
+    throw "Parse pipeline configuration failed. Error code [" + std::to_string(doc.GetParseError()) + "]" +
+        " Offset [" + std::to_string(doc.GetErrorOffset()) + "]. ";
+  }
+
+  for (rapidjson::Document::ConstMemberIterator iter = doc.MemberBegin(); iter != doc.MemberEnd(); ++iter) {
+    CNModuleConfig mconf;
+    mconf.name = iter->name.GetString();
+    try {
+      rapidjson::StringBuffer sbuf;
+      rapidjson::Writer<rapidjson::StringBuffer> jwriter(sbuf);
+      iter->value.Accept(jwriter);
+      mconf.ParseByJSONStr(std::string(sbuf.GetString()));
+    } catch (std::string e) {
+      throw "Parse module config failed. Module name : [" + mconf.name + "]" + ". Error message: " + e;
+    }
+    mconfs.push_back(mconf);
+  }
+
+  return BuildPipeline(mconfs);
 }
 
 Module* Pipeline::GetModule(const std::string& moduleName) {

@@ -288,7 +288,7 @@ int main(int argc, char **argv) {
 
   /*create pipeline*/
   MyPipeline pipeline("pipeline");
-  pipeline.BuildPipeine({module_a_config, module_b_config, module_c_config, module_d_config});
+  pipeline.BuildPipeline({module_a_config, module_b_config, module_c_config, module_d_config});
 
   /*start pipeline*/
   if (!pipeline.Start()) {
@@ -312,8 +312,7 @@ int main(int argc, char **argv) {
         usleep(1000);
       }
 
-      auto data_eos = cnstream::CNFrameInfo::Create(stream_id);
-      data_eos->frame.flags |= cnstream::CN_FRAME_FLAG_EOS;
+      auto data_eos = cnstream::CNFrameInfo::Create(stream_id, true);
       data_eos->channel_idx = j;
       pipeline.ProvideData(source, data_eos);
     }));

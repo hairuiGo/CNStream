@@ -23,10 +23,27 @@
 
 namespace cnstream {
 
+/*************************************************************************
+ * @brief get cnstream version string
+ * @return version string formatted as "v%major.%minor.%patch"
+ *         e.g. "v3.5.1"
+ ************************************************************************/
 const char* VersionString();
 
+/*************************************************************************
+ * @brief get cnstream major version
+ * @return major version, [0, MAXINT]
+ ************************************************************************/
 const int MajorVersion();
+/*************************************************************************
+ * @brief get cnstream minor version
+ * @return minor version, [0, MAXINT]
+ ************************************************************************/
 const int MinorVersion();
+/*************************************************************************
+ * @brief get cnstream patch version
+ * @return patch version, [0, MAXINT]
+ ************************************************************************/
 const int PatchVersion();
 
 }  // namespace cnstream

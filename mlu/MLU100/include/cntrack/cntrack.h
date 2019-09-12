@@ -28,8 +28,8 @@
 #include "cnbase/cntypes.h"
 #include "cnbase/reflex_object.h"
 #include "cnbase/streamlibs_error.h"
-#include "cntrack/feature_extractor.h"
 #include "cnvformat/cnvformat.h"
+#include "cninfer/model_loader.h"
 
 using CnObjects = std::vector<CnDetectObject>;
 
@@ -39,56 +39,32 @@ STREAMLIBS_REGISTER_EXCEPTION(CnTrack);
 
 class CnTrack {
  public:
-  static CnTrack* Create(const std::string &tracker);
+  static CnTrack* Create(const std::string &name);
   virtual ~CnTrack() {}
 
+  virtual void SetModel(std::shared_ptr<ModelLoader> model,
+                      int dev_id = 0,
+                      uint32_t batch_size = 1) {}
   virtual void SetParams(float max_cosine_distance,
-                         int nn_budget,
-                         float max_iou_distance,
-                         int max_age,
-                         int n_init) {}
+                      int nn_budget,
+                      float max_iou_distance,
+                      int max_age,
+                      int n_init) {}
   virtual void UpdateCpuFrame(cv::Mat image,
-                              const CnObjects &detects,
-                              CnObjects *tracks) noexcept(false) {}
+                      const CnObjects &detects,
+                      CnObjects *tracks) {}
+
   struct MluFrame {
     void *data;
     int device_id;
     CnGeometry size;
     CnPixelFormat format;
+    int64_t frame_id;
   };
-  virtual void UpdateMluFrame(struct MluFrame frame,
-                              const CnObjects &detects,
-                              CnObjects *tracks) noexcept(false) {}
+  virtual void UpdateMluFrame(const MluFrame &frame,
+                      const CnObjects &detects,
+                      CnObjects *tracks) noexcept(false) {}
 };  // class CnTrack
-
-class DeepSortTrack : public CnTrack,
-                      virtual public ReflexObjectEx<CnTrack> {
-  DECLARE_REFLEX_OBJECT_EX(DeepSortTrack, CnTrack);
-
- public:
-  ~DeepSortTrack();
-  void SetModel(std::shared_ptr<ModelLoader> model);
-  void SetParams(float max_cosine_distance,
-                 int nn_budget,
-                 float max_iou_distance,
-                 int max_age,
-                 int n_init) override;
-  void UpdateCpuFrame(cv::Mat image,
-                      const CnObjects &detects,
-                      CnObjects *tracks) override;
-  void UpdateMluFrame(MluFrame frame,
-                      const CnObjects &detects,
-                      CnObjects *track) override;
-
- private:
-  DeepSortTrack();
-
-  struct DeepSortPriv;
-  std::unique_ptr<DeepSortPriv> priv_;
-  std::unique_ptr<FeatureExtractor> feature_extractor_;
-  std::shared_ptr<ModelLoader> model_;
-};  // class DeepSortTrack
-
 }  // namespace libstream
 
 #endif  // _CNTRACK_HPP_

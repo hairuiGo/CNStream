@@ -32,13 +32,63 @@
 
 namespace cnstream {
 
-CNDataFrame::CNDataFrame() {}
-
 CNDataFrame::~CNDataFrame() {
   if (nullptr != mlu_data) {
     CALL_CNRT_BY_CONTEXT(cnrtFree(mlu_data), ctx.dev_id, ctx.ddr_channel);
   }
+  if (nullptr != cpu_data) {
+    CNStreamFreeHost(cpu_data), cpu_data = nullptr;
+  }
+#ifdef HAVE_OPENCV
+  if (nullptr != bgr_mat) {
+    delete bgr_mat,bgr_mat = nullptr;
+  }
+#endif
 }
+
+#ifdef HAVE_OPENCV
+cv::Mat *CNDataFrame::ImageBGR() {
+  if(bgr_mat != nullptr) {
+    return bgr_mat;
+  }
+  int stride_ = stride[0];
+  cv::Mat bgr(height, stride_, CV_8UC3);
+  uint8_t *img_data = new uint8_t[GetBytes()];
+  uint8_t* t = img_data;
+  for (int i = 0; i < GetPlanes(); ++i) {
+    memcpy(t, data[i]->GetCpuData(), GetPlaneBytes(i));
+    t += GetPlaneBytes(i);
+  }
+  switch (fmt) {
+    case CNDataFormat::CN_PIXEL_FORMAT_BGR24: {
+      bgr = cv::Mat(height, stride_, CV_8UC3, img_data).clone();
+    } break;
+    case CNDataFormat::CN_PIXEL_FORMAT_RGB24: {
+      cv::Mat src = cv::Mat(height, stride_, CV_8UC3, img_data);
+      cv::cvtColor(src, bgr, cv::COLOR_RGB2BGR);
+    } break;
+    case CNDataFormat::CN_PIXEL_FORMAT_YUV420_NV12: {
+      cv::Mat src = cv::Mat(height * 3 / 2, stride_, CV_8UC1, img_data);
+      cv::cvtColor(src, bgr, cv::COLOR_YUV2BGR_NV12);
+    } break;
+    case CNDataFormat::CN_PIXEL_FORMAT_YUV420_NV21: {
+      cv::Mat src = cv::Mat(height * 3 / 2, stride_, CV_8UC1, img_data);
+      cv::cvtColor(src, bgr, cv::COLOR_YUV2BGR_NV21);
+    } break;
+    default: {
+      LOG(WARNING) << "Unsupport pixel format.";
+      delete[] img_data;
+      return nullptr;
+    }
+  }
+	delete[] img_data;
+  bgr_mat = new cv::Mat();
+  if(bgr_mat) {
+    *bgr_mat = bgr;
+  }
+  return bgr_mat;
+}
+#endif
 
 size_t CNDataFrame::GetPlaneBytes(int plane_idx) const {
   if (plane_idx < 0 || plane_idx >= GetPlanes()) return 0;
@@ -46,13 +96,13 @@ size_t CNDataFrame::GetPlaneBytes(int plane_idx) const {
   switch (fmt) {
     case CN_PIXEL_FORMAT_BGR24:
     case CN_PIXEL_FORMAT_RGB24:
-      return height * strides[0] * 3;
+      return height * stride[0] * 3;
     case CN_PIXEL_FORMAT_YUV420_NV12:
     case CN_PIXEL_FORMAT_YUV420_NV21:
       if (0 == plane_idx)
-        return height * strides[0];
+        return height * stride[0];
       else if (1 == plane_idx)
-        return height * strides[1] / 2;
+        return height * stride[1] / 2;
       else
         LOG(FATAL) << "plane index wrong.";
     default:
@@ -69,133 +119,52 @@ size_t CNDataFrame::GetBytes() const {
   return bytes;
 }
 
-void CNDataFrame::CopyFrameFromMLU(int dev_id, int ddr_channel, CNDataFormat fmt, int width, int height, void** data,
-                                   const uint32_t* strides) {
-  if (DevContext::MLU == ctx.dev_type) {
-    // memory already on MLU
-    LOG(FATAL) << "Unsupport";
-  } else if (DevContext::CPU == ctx.dev_type) {
-    // memory on CPU. free it?
-    LOG(FATAL) << "Unsupport";
-  }
-
-  void* ptr = nullptr;
-  size_t bytes = 0;
-  switch (fmt) {
-    case CN_PIXEL_FORMAT_BGR24:
-    case CN_PIXEL_FORMAT_RGB24:
-      bytes = height * strides[0] * 3;
-      break;
-    case CN_PIXEL_FORMAT_YUV420_NV12:
-    case CN_PIXEL_FORMAT_YUV420_NV21:
-      bytes = height * strides[0] + height / 2 * strides[1];
-      break;
-    default:
-      LOG(ERROR) << "[CopyFrameFromMLU]: Unknown pixel format: " << static_cast<int>(fmt);
-  }
-
-  bytes = ROUND_UP(bytes, 64 * 1024);
-
-  CALL_CNRT_BY_CONTEXT(cnrtMalloc(&ptr, bytes), ctx.dev_id, ctx.ddr_channel);
-
-  const int planes = CNGetPlanes(fmt);
-  void* dst = ptr;
-  for (int i = 0; i < planes; ++i) {
-    size_t plane_size = 0;
-    switch (fmt) {
-      case CN_PIXEL_FORMAT_BGR24:
-      case CN_PIXEL_FORMAT_RGB24:
-        plane_size = height * strides[0] * 3;
-        break;
-      case CN_PIXEL_FORMAT_YUV420_NV12:
-      case CN_PIXEL_FORMAT_YUV420_NV21:
-        if (0 == i)
-          plane_size = height * strides[0];
-        else if (1 == i)
-          plane_size = height * strides[1] / 2;
-        else
-          LOG(FATAL) << "wrong plane size.";
-        break;
-      default:
-        LOG(ERROR) << "[CopyFrameFromMLU]: Unknown pixel format: " << static_cast<int>(fmt);
-        return;
-    }
-    CALL_CNRT_BY_CONTEXT(cnrtMemcpy(dst, data[i], plane_size, CNRT_MEM_TRANS_DIR_DEV2DEV), ctx.dev_id, ctx.ddr_channel);
-    dst = reinterpret_cast<void*>(reinterpret_cast<uint8_t*>(ptr) + plane_size);
-  }
-
-  {
-    this->width = width;
-    this->height = height;
-    this->mlu_data = ptr;
-    for (int i = 0; i < planes; ++i) {
-      this->strides[i] = strides[i];
-    }
-    this->fmt = fmt;
-    this->ctx.dev_id = dev_id;
-    this->ctx.dev_type = DevContext::MLU;
-    this->ctx.ddr_channel = ddr_channel;
-
-    auto t = reinterpret_cast<uint8_t*>(ptr);
-    for (int i = 0; i < planes; ++i) {
+void CNDataFrame::CopyToSyncMem() {
+  if(this->deAllocator_ != nullptr) {
+    /*cndecoder buffer will be used to avoid dev2dev copy*/
+    for(int i = 0; i < GetPlanes(); i++) {
       size_t plane_size = GetPlaneBytes(i);
       this->data[i].reset(new CNSyncedMemory(plane_size, ctx.dev_id, ctx.ddr_channel));
-      this->data[i]->SetMluDevContext(dev_id, ddr_channel);
-      this->data[i]->SetMluData(t);
-      t += plane_size;
+      this->data[i]->SetMluData(this->ptr[i]);
     }
+    return;
   }
-}
-
-void CNDataFrame::ReallocMemory(int width, int height) {
-  if (DevContext::CPU == ctx.dev_type) {
-    this->width = width;
-    this->height = height;
-    switch (fmt) {
-      case CNDataFormat::CN_PIXEL_FORMAT_BGR24:
-      case CNDataFormat::CN_PIXEL_FORMAT_RGB24:
-        this->strides[0] = width;
-        break;
-      case CNDataFormat::CN_PIXEL_FORMAT_YUV420_NV12:
-      case CNDataFormat::CN_PIXEL_FORMAT_YUV420_NV21:
-        this->strides[0] = this->strides[1] = width;
-      default:
-        return;
+  /*deep copy*/
+  if(this->ctx.dev_type == DevContext::MLU) {
+    if(mlu_data != nullptr) {
+      LOG(FATAL) << "CopyToSyncMem should be called once for each frame";
     }
-
-    for (int i = 0; i < GetPlanes(); ++i) {
-      this->data[i].reset(new CNSyncedMemory(GetPlaneBytes(i), ctx.dev_id, ctx.ddr_channel));
+    size_t bytes = GetBytes();
+    bytes = ROUND_UP(bytes, 64 * 1024);
+    CALL_CNRT_BY_CONTEXT(cnrtMalloc(&mlu_data, bytes), ctx.dev_id, ctx.ddr_channel);
+    void* dst = mlu_data;
+    for(int i = 0; i < GetPlanes(); i++) {
+      size_t plane_size = GetPlaneBytes(i);
+      CALL_CNRT_BY_CONTEXT(cnrtMemcpy(dst, ptr[i], plane_size, CNRT_MEM_TRANS_DIR_DEV2DEV), ctx.dev_id, ctx.ddr_channel);
+      this->data[i].reset(new CNSyncedMemory(plane_size, ctx.dev_id, ctx.ddr_channel));
+      this->data[i]->SetMluData(dst);
+      dst = (void*)((uint8_t*)dst + plane_size);
     }
-  }
-}
-
-void CNDataFrame::ReallocMemory(CNDataFormat format) {
-  if (fmt == format) return;
-
-  size_t old_bytes = GetBytes();
-  size_t new_bytes = 0;
-  switch (format) {
-    case CNDataFormat::CN_PIXEL_FORMAT_BGR24:
-    case CNDataFormat::CN_PIXEL_FORMAT_RGB24:
-      new_bytes = width * height * 3;
-      break;
-    case CNDataFormat::CN_PIXEL_FORMAT_YUV420_NV12:
-    case CNDataFormat::CN_PIXEL_FORMAT_YUV420_NV21:
-      new_bytes = width * height * 3 / 2;
-      break;
-    default:
-      return;
-  }
-
-  if (new_bytes == old_bytes) return;
-
-  fmt = format;
-
-  for (int i = 0; i < GetPlanes(); ++i) strides[i] = width;
-
-  for (int i = 0; i < GetPlanes(); ++i) {
-    size_t plane_size = GetPlaneBytes(i);
-    data[i].reset(new CNSyncedMemory(plane_size, ctx.dev_id, ctx.ddr_channel));
+  } else if(this->ctx.dev_type == DevContext::CPU) {
+    if(cpu_data != nullptr) {
+      LOG(FATAL) << "CopyToSyncMem should be called once for each frame";
+    }
+    size_t bytes = GetBytes();
+    bytes = ROUND_UP(bytes, 64 * 1024);
+    CNStreamMallocHost(&cpu_data, bytes);
+    if(nullptr == cpu_data) {
+      LOG(FATAL) << "CopyToSyncMem: failed to alloc cpu memory";
+    }
+    void* dst = cpu_data;
+    for(int i = 0; i < GetPlanes(); i++) {
+      size_t plane_size = GetPlaneBytes(i);
+      memcpy(dst, ptr[i], plane_size);
+      this->data[i].reset(new CNSyncedMemory(plane_size));
+      this->data[i]->SetCpuData(dst);
+      dst = (void*)((uint8_t*)dst + plane_size);
+    }
+  } else {
+    LOG(FATAL) << "Device type not supported";
   }
 }
 
@@ -282,13 +251,17 @@ int CNFrameInfo::parallelism_ = 0;
 
 void SetParallelism(int parallelism) { CNFrameInfo::parallelism_ = parallelism; }
 
-std::shared_ptr<CNFrameInfo> CNFrameInfo::Create(const std::string& stream_id) {
+std::shared_ptr<CNFrameInfo> CNFrameInfo::Create(const std::string& stream_id, bool eos) {
   CNFrameInfo* frameInfo = new CNFrameInfo();
   if (!frameInfo) {
     return nullptr;
   }
   frameInfo->frame.stream_id = stream_id;
   std::shared_ptr<CNFrameInfo> ptr(frameInfo);
+  if(eos) {
+    ptr->frame.flags |= cnstream::CN_FRAME_FLAG_EOS;
+    return ptr;
+  }
 
   if (parallelism_ > 0) {
     std::unique_lock<std::mutex> lock(mutex_);
@@ -310,6 +283,12 @@ std::shared_ptr<CNFrameInfo> CNFrameInfo::Create(const std::string& stream_id) {
 }
 
 CNFrameInfo::~CNFrameInfo() {
+  if(frame.flags & CN_FRAME_FLAG_EOS) {
+    return;
+  }
+  if (frame.ctx.dev_type == DevContext::INVALID) {
+    return;
+  }
   if (parallelism_ > 0) {
     std::unique_lock<std::mutex> lock(mutex_);
     auto iter = stream_count_map_.find(frame.stream_id);

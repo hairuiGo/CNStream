@@ -24,8 +24,6 @@
 
 namespace cnstream {
 
-DisplayStream::DisplayStream() {}
-
 bool DisplayStream::Open(int window_w, int window_h, int cols, int rows, float display_rate) {
   if (window_w < 1 || window_h < 1 || cols < 1 || rows < 1 || display_rate < 1) {
     return false;
@@ -50,6 +48,7 @@ void DisplayStream::Close() {
     refresh_thread_->join();
   }
   delete refresh_thread_;
+  refresh_thread_ = nullptr;
   canvas_.release();
 }
 
@@ -72,7 +71,7 @@ void DisplayStream::RefreshLoop() {
     auto cycle = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> dura = cycle - start;
     start = cycle;
-    int rt = dura.count() - delay_ms;
+    int rt = delay_ms - dura.count();
     if (rt > 0) {
       std::this_thread::sleep_for(std::chrono::milliseconds(rt));
     }

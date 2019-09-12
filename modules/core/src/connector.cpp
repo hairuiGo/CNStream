@@ -32,11 +32,10 @@ class ConnectorPrivate {
   ~ConnectorPrivate();
   Conveyor* GetConveyorByIdx(int idx) const;
 
-  Connector* q_ptr_;
+  DECLARE_PUBLIC(q_ptr_, Connector);
   std::vector<Conveyor*> vec_conveyor_;
   size_t conveyor_capacity_ = 20;
   bool stop_ = false;
-  DECLARE_PUBLIC(q_ptr_, Connector);
   DISABLE_COPY_AND_ASSIGN(ConnectorPrivate);
 };  // class ConnectorPrivate
 
@@ -64,7 +63,7 @@ void Connector::PushDataBufferToConveyor(int conveyor_idx, CNFrameInfoPtr data) 
   GetConveyor(conveyor_idx)->PushDataBuffer(data);
 }
 
-bool Connector::IsStopped() { return d_ptr_->stop_; }
+bool Connector::IsStopped() const { return d_ptr_->stop_; }
 
 void Connector::Start() { d_ptr_->stop_ = false; }
 

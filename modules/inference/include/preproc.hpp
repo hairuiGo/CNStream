@@ -25,7 +25,7 @@
 #include <utility>
 #include <vector>
 
-#include "cnbase/cnshape.h"
+#include "cninfer/model_loader.h"
 #include "cnbase/reflex_object.h"
 
 #include "cnstream_frame.hpp"
@@ -42,19 +42,22 @@ class Preproc {
   /******************************************************************************
    * @brief Execute preproc on neural network inputs
    * @param
+   *   net_inputs: neural network input data
+   *   model: model information(you can get input shape and output shape from model)
    *   package: smart pointer of struct stored network input image
-   *   nn_inputs: neural network input data and shapes
-   * @return return true if succeed, false otherwise
+   * @return return true if succeed
    ******************************************************************************/
-  virtual bool Execute(CNFrameInfoPtr package, std::vector<std::pair<float*, libstream::CnShape>> nn_inputs) = 0;
+  virtual int Execute(const std::vector<float*>& net_inputs, const std::shared_ptr<libstream::ModelLoader>& model,
+    const CNFrameInfoPtr& package) = 0;
 };  // class Preproc
 
 class PreprocCpu : public Preproc, virtual public libstream::ReflexObjectEx<Preproc> {
  public:
   /******************************************************************************
-   * @attention nn_inputs is a pointer to pre-allocated cpu memory
+   * @attention net_inputs is a pointer to pre-allocated cpu memory
    ******************************************************************************/
-  bool Execute(CNFrameInfoPtr package, std::vector<std::pair<float*, libstream::CnShape>> nn_inputs) override;
+  int Execute(const std::vector<float*>& net_inputs, const std::shared_ptr<libstream::ModelLoader>& model,
+    const CNFrameInfoPtr& package) override;
 
   DECLARE_REFLEX_OBJECT_EX(PreprocCpu, Preproc);
 };  // class PreprocCpu

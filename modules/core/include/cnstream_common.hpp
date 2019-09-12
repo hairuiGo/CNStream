@@ -27,9 +27,13 @@
   TypeName(const TypeName&) = delete;     \
   const TypeName& operator=(const TypeName&) = delete;
 
-#define DECLARE_PRIVATE(Dptr, Class) friend class Class##Private;
+#define DECLARE_PRIVATE(d_ptr, Class)     \
+  friend class Class##Private;            \
+  Class##Private *d_ptr = nullptr;
 
-#define DECLARE_PUBLIC(Qptr, Class) friend class Class;
+#define DECLARE_PUBLIC(q_ptr, Class)    \
+  friend class Class;                   \
+  Class *q_ptr = nullptr;
 
 #define UNSUPPORTED LOG(FATAL) << "Not supported";
 
@@ -43,12 +47,6 @@
 
 #define CALL_CNRT_BY_CONTEXT(__EXPRESSION__, __DEV_ID__, __DDR_CHN__)          \
   do {                                                                         \
-    /* Save the context */                                                     \
-    /* cnrtDev_t old_dev; */                                                   \
-    /* cnrtChannelType_t old_ddr_chn; */                                       \
-    /* CNS_CNRT_CHECK(cnrtGetCurrentDevice(&old_dev)); */                      \
-    /* CNS_CNRT_CHECK(cnrtGetCurrentChannel(&old_ddr_chn)); */                 \
-    /* Do */                                                                   \
     int dev_id = (__DEV_ID__);                                                 \
     cnrtDev_t dev;                                                             \
     cnrtChannelType_t ddr_chn = static_cast<cnrtChannelType_t>((__DDR_CHN__)); \
@@ -56,9 +54,6 @@
     CNS_CNRT_CHECK(cnrtSetCurrentDevice(dev));                                 \
     CNS_CNRT_CHECK(cnrtSetCurrentChannel(ddr_chn));                            \
     CNS_CNRT_CHECK(__EXPRESSION__);                                            \
-    /* Recovery context */                                                     \
-    /* CNS_CNRT_CHECK(cnrtSetCurrentDevice(old_dev)); */                       \
-    /* CNS_CNRT_CHECK(cnrtSetCurrentChannel(old_ddr_chn)); */                  \
   } while (0)
 
 #endif  // CNSTREAM_COMMON_HPP_

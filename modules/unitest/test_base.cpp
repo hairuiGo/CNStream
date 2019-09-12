@@ -29,7 +29,7 @@ std::string GetExePath() {
   char path[PATH_MAX_LENGTH];
   int cnt = readlink("/proc/self/exe", path, PATH_MAX_LENGTH);
   if (cnt < 0 || cnt >= PATH_MAX_LENGTH) {
-    return NULL;
+    return "";
   }
   for (int i = cnt; i >= 0; --i) {
     if ('/' == path[i]) {

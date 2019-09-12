@@ -36,19 +36,19 @@ uint32_t seed_conveyor;
 int flag[80];
 const char* kind[80];
 
-void thread_func_pushDataBuf(Conveyor* conveyor, CNFrameInfoPtr data, int id) {
+void ThreadFuncPushDataBuf(Conveyor* conveyor, CNFrameInfoPtr data, int id) {
   kind[id] = "pushDataBuf";
   conveyor->PushDataBuffer(data);
   flag[id]++;
 }
 
-void thread_func_popDataBuf(Conveyor* conveyor, int id) {
+void ThreadFuncPopDataBuf(Conveyor* conveyor, int id) {
   kind[id] = "popdataBuf";
   conveyor->PopDataBuffer();
   flag[id]++;
 }
 
-void Thread_func_state(int id) {
+void ThreadFuncState(int id) {
   int cnt = 0;
   while (1) {
     bool f = true;
@@ -84,11 +84,11 @@ TEST(CoreConveyor, MultiThreadPushPop) {
   while (id < 30) {
     switch (rand_r(&seed_conveyor) % 2) {
       case 0:
-        thread_ids[id] = new std::thread(thread_func_pushDataBuf, &conveyor, data, id);
+        thread_ids[id] = new std::thread(ThreadFuncPushDataBuf, &conveyor, data, id);
         data_buf_num++;
         break;
       case 1:
-        thread_ids[id] = new std::thread(thread_func_popDataBuf, &conveyor, id);
+        thread_ids[id] = new std::thread(ThreadFuncPopDataBuf, &conveyor, id);
         data_buf_num--;
         break;
       default:
@@ -98,12 +98,12 @@ TEST(CoreConveyor, MultiThreadPushPop) {
   }
 
   while (data_buf_num < 0) {
-    thread_ids[id] = new std::thread(thread_func_pushDataBuf, &conveyor, data, id);
+    thread_ids[id] = new std::thread(ThreadFuncPushDataBuf, &conveyor, data, id);
     data_buf_num++;
     id++;
   }
 
-  thread_ids[id] = new std::thread(Thread_func_state, id - 1);
+  thread_ids[id] = new std::thread(ThreadFuncState, id - 1);
   id++;
 
   for (int i = 0; i < id; i++) thread_ids[i]->join();

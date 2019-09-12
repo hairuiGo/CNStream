@@ -35,34 +35,59 @@ class Pipeline;
 class Module;
 class EventBusPrivate;
 
+/************************************************************************
+ * @brief flag to specify event type
+ ************************************************************************/
 enum EventType {
+  /// Invalid event type
   EVENT_INVALID,
+  /// error event
   EVENT_ERROR,
+  /// warning event
   EVENT_WARNING,
+  /// EOS event
   EVENT_EOS,
+  /// stop event, raised by application layer usually
   EVENT_STOP,
-  // remaining for custom event
+  /// remaining for user custom event
   EVENT_TYPE_END
 };
 
+/************************************************************************
+ * @brief flag to specify the way in which bus watcher handled one event
+ ************************************************************************/
 enum EventHandleFlag {
-  // event not handled
+  /// event not handled
   EVENT_HANDLE_NULL,
-  // watcher informed and intercept event
+  /// watcher informed and intercept event
   EVENT_HANDLE_INTERCEPTION,
-  // watcher informed and inform other watchers
+  /// watcher informed and inform other watchers
   EVENT_HANDLE_SYNCED,
-  // stop poll event
+  /// stop poll event
   EVENT_HANDLE_STOP
 };
 
+/************************************************************************
+ * @brief structure to store event information
+ ************************************************************************/
 struct Event {
+  /// event type
   EventType type;
+  /// additional event message
   std::string message;
+  /// module that post this event
   const Module *module;
+  /// thread id from which event is posted
   std::thread::id thread_id;
 };  // struct Event
 
+/************************************************************************
+ * @brief bus watcher function
+ * @param
+ *   event[in]: event polled from eventbus
+ *   module[in]: module that is watching
+ * @return flag indicated how the event was handled
+ ************************************************************************/
 using BusWatcher = std::function<EventHandleFlag(const Event &, Module *)>;
 
 class EventBus {
@@ -90,14 +115,21 @@ class EventBus {
 #endif
   EventBus();
   ~EventBus();
+
+  /************************************************************************
+   * @brief poll a event from bus [block]
+   * @attention block until get a event or bus stopped
+   ************************************************************************/
   Event PollEvent();
   const std::list<std::pair<BusWatcher, Module *>> &GetBusWatchers() const;
+  /************************************************************************
+   * @brief remove all bus watchers
+   ************************************************************************/
   void ClearAllWatchers();
-  inline bool IsRunning() { return running_; }
+  inline bool IsRunning() const { return running_; }
+  bool running_ = false;
 
  private:
-  EventBusPrivate *d_ptr_;
-  bool running_ = false;
   std::mutex watcher_mut_;
 
   DECLARE_PRIVATE(d_ptr_, EventBus);

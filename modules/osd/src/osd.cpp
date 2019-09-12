@@ -27,7 +27,11 @@
 #include <vector>
 
 #include "cnosd/cnosd.h"
-#include "opencv2/opencv.hpp"
+#ifdef HAVE_OPENCV
+ #include "opencv2/opencv.hpp"
+#else
+ #error OpenCV required
+#endif
 
 static std::vector<string> LoadLabels(const std::string& label_path) {
   std::vector<std::string> labels;
@@ -50,6 +54,7 @@ Osd::Osd(const std::string& name) : Module(name) {}
 
 bool Osd::Open(cnstream::ModuleParamSet paramSet) {
   if (paramSet.find("label_path") == paramSet.end()) {
+    LOG(ERROR) << "Can not find label_path from module parameters.";
     return false;
   }
   std::string label_path = paramSet.find("label_path")->second;
@@ -63,50 +68,6 @@ void Osd::Close() { /*empty*/
 int Osd::Process(std::shared_ptr<CNFrameInfo> data) {
   libstream::CnOsd processor(1, 1, labels_);
 
-  int width = data->frame.width;
-  int height = data->frame.height;
-
-  CNDataFormat format = data->frame.fmt;
-
-  uint8_t* img_data = new uint8_t[data->frame.GetBytes()];
-  uint8_t* t = img_data;
-  for (int i = 0; i < data->frame.GetPlanes(); ++i) {
-    memcpy(t, data->frame.data[i]->GetCpuData(), data->frame.GetPlaneBytes(i));
-    t += data->frame.GetPlaneBytes(i);
-  }
-
-  cv::Mat img;
-
-  switch (format) {
-    case CNDataFormat::CN_PIXEL_FORMAT_BGR24:
-      img = cv::Mat(height, width, CV_8UC3, img_data).clone();
-      break;
-    case CNDataFormat::CN_PIXEL_FORMAT_RGB24:
-      img = cv::Mat(height, width, CV_8UC3, img_data).clone();
-      cv::cvtColor(img, img, cv::COLOR_RGB2BGR);
-      break;
-    case CNDataFormat::CN_PIXEL_FORMAT_YUV420_NV12: {
-      img = cv::Mat(height * 3 / 2, width, CV_8UC1, img_data);
-      cv::Mat bgr(height, width, CV_8UC3);
-      cv::cvtColor(img, bgr, cv::COLOR_YUV2BGR_NV12);
-      img = bgr;
-      data->frame.ReallocMemory(CNDataFormat::CN_PIXEL_FORMAT_BGR24);
-    } break;
-    case CNDataFormat::CN_PIXEL_FORMAT_YUV420_NV21: {
-      img = cv::Mat(height * 3 / 2, width, CV_8UC1, img_data);
-      cv::Mat bgr(height, width, CV_8UC3);
-      cv::cvtColor(img, bgr, cv::COLOR_YUV2BGR_NV21);
-      img = bgr;
-      data->frame.ReallocMemory(CNDataFormat::CN_PIXEL_FORMAT_BGR24);
-    } break;
-    default:
-      LOG(WARNING) << "[Osd] Unsupport pixel format.";
-      delete[] img_data;
-      return -1;
-  }
-
-  delete[] img_data;
-
   std::vector<CnDetectObject> objs;
   for (const auto& it : data->objs) {
     CnDetectObject cn_obj;
@@ -119,10 +80,7 @@ int Osd::Process(std::shared_ptr<CNFrameInfo> data) {
     cn_obj.track_id = it->track_id.empty() ? -1 : std::stoi(it->track_id);
     objs.push_back(cn_obj);
   }
-  processor.DrawLabel(img, objs);
-
-  cv::Mat frame(height, width, CV_8UC3, data->frame.data[0]->GetMutableCpuData());
-  img.copyTo(frame);
+  processor.DrawLabel(*data->frame.ImageBGR(), objs);
 
   return 0;
 }

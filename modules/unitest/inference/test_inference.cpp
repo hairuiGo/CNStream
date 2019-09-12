@@ -34,6 +34,7 @@
 #include "cninfer/model_loader.h"
 
 #include "inferencer.hpp"
+#include "test_base.hpp"
 
 namespace cnstream {
 
@@ -47,29 +48,12 @@ static const char *g_postproc_name = "PostprocSsd";
 static constexpr int g_dev_id = 0;
 static constexpr int g_channel_id = 0;
 
-static constexpr int PATH_MAX_LENGTH = 1 << 10;
-
-std::string GetExePath() {
-  char path[PATH_MAX_LENGTH];
-  int cnt = readlink("/proc/self/exe", path, PATH_MAX_LENGTH);
-  if (cnt < 0 || cnt >= PATH_MAX_LENGTH) {
-    return "";
-  }
-  for (int i = cnt; i >= 0; --i) {
-    if ('/' == path[i]) {
-      path[i + 1] = '\0';
-      break;
-    }
-  }
-  return std::string(path);
-}
-
-TEST(Inferencer, TestConstruct) {
+TEST(Inferencer, Construct) {
   std::shared_ptr<Module> infer = std::make_shared<Inferencer>(name);
   EXPECT_STREQ(infer->GetName().c_str(), name);
 }
 
-TEST(Inferencer, TestOpenClose) {
+TEST(Inferencer, OpenClose) {
   std::shared_ptr<Module> infer = std::make_shared<Inferencer>(name);
   ModuleParamSet param;
   EXPECT_FALSE(infer->Open(param));
@@ -85,7 +69,7 @@ TEST(Inferencer, TestOpenClose) {
   infer->Close();
 }
 
-TEST(Inferencer, TestProcess) {
+TEST(Inferencer, Process) {
   std::string model_path = GetExePath() + g_model_path;
   std::string image_path = GetExePath() + g_image_path;
 
@@ -105,14 +89,14 @@ TEST(Inferencer, TestProcess) {
     nbytes = (nbytes + boundary - 1) & ~(boundary - 1);  // align to 64kb
 
     // fake data
-    void* frame_data = nullptr;
-    void* planes[CN_MAX_PLANES] = { nullptr, nullptr };
+    void *frame_data = nullptr;
+    void *planes[CN_MAX_PLANES] = {nullptr, nullptr};
     libstream::MluMemoryOp mem_op;
     frame_data = mem_op.alloc_mem_on_mlu(nbytes, 1);
-    planes[0] = frame_data;  // y plane
-    planes[1] = reinterpret_cast<void*>(reinterpret_cast<int64_t>(frame_data) + width * height);  // uv plane
+    planes[0] = frame_data;                                                                        // y plane
+    planes[1] = reinterpret_cast<void *>(reinterpret_cast<int64_t>(frame_data) + width * height);  // uv plane
 
-    uint32_t strides[CN_MAX_PLANES] = { (uint32_t)width, (uint32_t)width };
+    uint32_t strides[CN_MAX_PLANES] = {(uint32_t)width, (uint32_t)width};
 
     // test nv12
     {

@@ -23,17 +23,18 @@
 #include <glog/logging.h>
 
 #include "cnstream_eventbus.hpp"
+#include "display_stream.hpp"
 
 namespace cnstream {
 
-Displayer::Displayer(const std::string &name) : Module(name) {}
+Displayer::Displayer(const std::string &name) : Module(name) { stream_ = new DisplayStream; }
 
-Displayer::~Displayer() { Close(); }
+Displayer::~Displayer() { delete stream_; }
 
 bool Displayer::Open(ModuleParamSet paramSet) {
   if (paramSet.find("window-width") == paramSet.end() || paramSet.find("window-height") == paramSet.end() ||
       paramSet.find("cols") == paramSet.end() || paramSet.find("rows") == paramSet.end() ||
-      paramSet.find("display-rate") == paramSet.end()) {
+      paramSet.find("refresh-rate") == paramSet.end()) {
     LOG(ERROR) << "[Displayer] Parameter not set";
     return false;
   }
@@ -41,9 +42,9 @@ bool Displayer::Open(ModuleParamSet paramSet) {
   int window_h = std::stoi(paramSet["window-height"]);
   int rows = std::stoi(paramSet["rows"]);
   int cols = std::stoi(paramSet["cols"]);
-  float display_rate = std::stof(paramSet["display-rate"]);
+  float display_rate = std::stof(paramSet["refresh-rate"]);
 
-  if (!stream_.Open(window_w, window_h, cols, rows, display_rate)) {
+  if (!stream_->Open(window_w, window_h, cols, rows, display_rate)) {
     LOG(ERROR) << "[Displayer] Invalid parameter";
     return false;
   }
@@ -51,52 +52,10 @@ bool Displayer::Open(ModuleParamSet paramSet) {
   return true;
 }
 
-void Displayer::Close() { stream_.Close(); }
+void Displayer::Close() { stream_->Close(); }
 
 int Displayer::Process(CNFrameInfoPtr data) {
-  const int width = data->frame.width;
-  const int height = data->frame.height;
-
-  uint8_t *img_data = new uint8_t[data->frame.GetBytes()];
-  uint8_t *t = img_data;
-
-  for (int i = 0; i < data->frame.GetPlanes(); ++i) {
-    memcpy(t, data->frame.data[i]->GetCpuData(), data->frame.GetPlaneBytes(i));
-    t += data->frame.GetPlaneBytes(i);
-  }
-
-  cv::Mat img;
-
-  switch (data->frame.fmt) {
-    case cnstream::CNDataFormat::CN_PIXEL_FORMAT_BGR24:
-      img = cv::Mat(height, width, CV_8UC3, img_data);
-      break;
-    case cnstream::CNDataFormat::CN_PIXEL_FORMAT_RGB24:
-      img = cv::Mat(height, width, CV_8UC3, img_data);
-      cv::cvtColor(img, img, cv::COLOR_RGB2BGR);
-      break;
-    case cnstream::CNDataFormat::CN_PIXEL_FORMAT_YUV420_NV12: {
-      img = cv::Mat(height * 3 / 2, width, CV_8UC1, img_data);
-      cv::Mat bgr(height, width, CV_8UC3);
-      cv::cvtColor(img, bgr, cv::COLOR_YUV2BGR_NV12);
-      img = bgr;
-    } break;
-    case cnstream::CNDataFormat::CN_PIXEL_FORMAT_YUV420_NV21: {
-      img = cv::Mat(height * 3 / 2, width, CV_8UC1, img_data);
-      cv::Mat bgr(height, width, CV_8UC3);
-      cv::cvtColor(img, bgr, cv::COLOR_YUV2BGR_NV21);
-      img = bgr;
-    } break;
-    default:
-      LOG(WARNING) << "[Displayer] Unsupport pixel format.";
-      delete[] img_data;
-      return -1;
-  }
-
-  stream_.Update(img, data->channel_idx);
-
-  delete[] img_data;
-
+  stream_->Update(*data->frame.ImageBGR(), data->channel_idx);
   return 0;
 }
 

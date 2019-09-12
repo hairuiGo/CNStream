@@ -34,8 +34,8 @@ size_t Module::GetId() {
     return id_;
   }
   for (size_t i = 0; i < sizeof(module_id_mask_) * 8; i++) {
-    if (!(module_id_mask_ & (1 << i))) {
-      module_id_mask_ |= 1 << i;
+    if (!(module_id_mask_ & ((uint64_t)1 << i))) {
+      module_id_mask_ |= (uint64_t)1 << i;
       id_ = i;
       return i;
     }

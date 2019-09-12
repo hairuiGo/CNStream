@@ -179,7 +179,8 @@ class TestProcessorFailure : public TestProcessor {
 
 class TestProvider : public TestProcessor {
  public:
-  explicit TestProvider(int chns, cnstream::Pipeline* pipeline) : TestProcessor("TestProvider", chns), pipeline_(pipeline) {
+  explicit TestProvider(int chns, cnstream::Pipeline* pipeline)
+      : TestProcessor("TestProvider", chns), pipeline_(pipeline) {
     EXPECT_TRUE(nullptr != pipeline);
     EXPECT_GT(chns, 0);
     std::default_random_engine e(time(NULL));
@@ -258,7 +259,7 @@ CreatePipelineByNeighborList(const std::vector<std::list<int>>& neighbor_list, F
   }
 
   // add modules
-  pipeline->AddModule(modules);
+  for (auto module : modules) pipeline->AddModule(module);
 
   // set thread number
   std::uniform_int_distribution<> ths_randomer(1, dynamic_cast<TestProcessor*>(modules[0].get())->GetCnts().size());
@@ -335,14 +336,10 @@ void TestProcessFailure(const std::vector<std::list<int>>& neighbor_list, int pr
   provider->StopSendData();
 }
 
-void TestFunc(const std::vector<std::list<int>>& neighbor_list) {
-  TestProcess(neighbor_list);
-  TestProcessFailure(neighbor_list, -1);
-}
-
-TEST(CorePipeline, CorePipeline) {
+TEST(CorePipeline, Pipeline) {
   for (auto& it : g_neighbor_lists) {
-    TestFunc(it);
+    TestProcess(it);
+    TestProcessFailure(it, -1);
   }
-  TestFunc(g_neighbor_lists[0]);
+  TestProcess(g_neighbor_lists[0]);
 }

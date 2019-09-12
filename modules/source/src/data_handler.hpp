@@ -24,28 +24,77 @@
 #include <string>
 #include <thread>
 
+#include "cnstream_frame.hpp"
 #include "data_source.hpp"
 
 namespace cnstream {
 
 class DataHandler {
  public:
-  explicit DataHandler(DataSource *module) : module_(module) { streamIndex_ = this->GetStreamIndex(); }
-  virtual ~DataHandler() { this->ReturnStreamIndex(); }
+  explicit DataHandler(DataSource *module, const std::string &stream_id, int frame_rate, bool loop)
+      : module_(module), stream_id_(stream_id), frame_rate_(frame_rate), loop_(loop) {
+    streamIndex_ = this->GetStreamIndex();
+  }
+  virtual ~DataHandler() {
+    this->ReturnStreamIndex();
+    Close();
+  }
 
-  virtual bool Open() = 0;
-  virtual void Close() = 0;
+  bool Open();
+  void Close();
+
+ public:
+  std::string GetStreamId() const { return stream_id_; }
+  size_t GetStreamIndex();
+  static const size_t INVALID_STREAM_ID = -1;
+  DevContext GetDevContext() const { return dev_ctx_; }
+  bool SendData(std::shared_ptr<CNFrameInfo> data) {
+    if (this->module_) {
+      return this->module_->SendData(data);
+    }
+    return false;
+  }
+  void EnableFlowEos(bool enable) {
+    if (enable)
+      send_flow_eos_.store(1);
+    else
+      send_flow_eos_.store(0);
+  }
+  void SendFlowEos() {
+    auto data = CNFrameInfo::Create(stream_id_,true);
+    data->channel_idx = streamIndex_;
+    LOG(INFO) << "[Source]  " << stream_id_ << " receive eos.";
+    if (this->module_ && send_flow_eos_.load()) {
+      this->module_->SendData(data);
+    }
+  }
+  bool GetDemuxEos() const { return demux_eos_.load() ? true : false; }
 
  protected:
   DataSource *module_ = nullptr;
-  size_t GetStreamIndex();
-  static const size_t INVALID_STREAM_ID = -1;
+  std::string stream_id_;
+  int frame_rate_;
+  bool loop_;
+  DataSourceParam param_;
+  DevContext dev_ctx_;
+  size_t interval_ = 1;
+  std::atomic<int> demux_eos_{0};
 
  private:
   size_t streamIndex_ = INVALID_STREAM_ID;
-  void ReturnStreamIndex();
+  void ReturnStreamIndex() const;
   static std::mutex index_mutex_;
   static uint64_t index_mask_;
+
+  std::atomic<int> running_{0};
+  std::thread thread_;
+  void Loop();
+  /*the below three funcs are in the same thread*/
+  virtual bool PrepareResources() = 0;
+  virtual void ClearResources() = 0;
+  virtual bool Process() = 0;
+  /**/
+  std::atomic<int> send_flow_eos_{0};
 };
 
 }  // namespace cnstream

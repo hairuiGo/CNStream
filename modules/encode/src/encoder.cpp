@@ -67,50 +67,7 @@ void Encoder::Close() {
 
 int Encoder::Process(CNFrameInfoPtr data) {
   EncoderContext *ctx = GetEncoderContext(data);
-
-  const int width = data->frame.width;
-  const int height = data->frame.height;
-
-  uint8_t *img_data = new uint8_t[data->frame.GetBytes()];
-  uint8_t *t = img_data;
-
-  for (int i = 0; i < data->frame.GetPlanes(); ++i) {
-    memcpy(t, data->frame.data[i]->GetCpuData(), data->frame.GetPlaneBytes(i));
-    t += data->frame.GetPlaneBytes(i);
-  }
-
-  cv::Mat img;
-
-  switch (data->frame.fmt) {
-    case cnstream::CNDataFormat::CN_PIXEL_FORMAT_BGR24:
-      img = cv::Mat(height, width, CV_8UC3, img_data);
-      break;
-    case cnstream::CNDataFormat::CN_PIXEL_FORMAT_RGB24:
-      img = cv::Mat(height, width, CV_8UC3, img_data);
-      cv::cvtColor(img, img, cv::COLOR_RGB2BGR);
-      break;
-    case cnstream::CNDataFormat::CN_PIXEL_FORMAT_YUV420_NV12: {
-      img = cv::Mat(height * 3 / 2, width, CV_8UC1, img_data);
-      cv::Mat bgr(height, width, CV_8UC3);
-      cv::cvtColor(img, bgr, cv::COLOR_YUV2BGR_NV12);
-      img = bgr;
-    } break;
-    case cnstream::CNDataFormat::CN_PIXEL_FORMAT_YUV420_NV21: {
-      img = cv::Mat(height * 3 / 2, width, CV_8UC1, img_data);
-      cv::Mat bgr(height, width, CV_8UC3);
-      cv::cvtColor(img, bgr, cv::COLOR_YUV2BGR_NV21);
-      img = bgr;
-    } break;
-    default:
-      LOG(WARNING) << "[Encoder] Unsupport pixel format.";
-      delete[] img_data;
-      return -1;
-  }
-
-  ctx->writer.write(img);
-
-  delete[] img_data;
-
+  ctx->writer.write(*data->frame.ImageBGR());
   return 0;
 }
 

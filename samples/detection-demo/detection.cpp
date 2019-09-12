@@ -33,23 +33,16 @@
 #include "util.hpp"
 
 DEFINE_string(data_path, "", "video file list.");
-DEFINE_double(drop_rate, 0, "Decode drop frame rate (0~1)");
 DEFINE_int32(src_frame_rate, 25, "frame rate for send data");
 DEFINE_int32(wait_time, 0, "time of one test case");
 DEFINE_bool(rtsp, false, "use rtsp");
 DEFINE_bool(input_image, false, "input image");
-DEFINE_string(dump_dir, "", "dump result images to this directory");
-DEFINE_string(label_path, "", "label path");
 DEFINE_bool(loop, false, "display repeat");
-DEFINE_string(model_path, "", "offline model path");
-DEFINE_string(model_path_tracker, "", "track model path");
-DEFINE_string(postproc_name, "", "postproc class name");
-DEFINE_string(preproc_name, "", "preproc class name");
-DEFINE_int32(device_id, 0, "mlu device index");
+DEFINE_string(config_fname, "", "pipeline config filename");
 
 class PipelineWatcher {
  public:
-  PipelineWatcher(cnstream::Pipeline* pipeline) : pipeline_(pipeline) {
+  explicit PipelineWatcher(cnstream::Pipeline* pipeline) : pipeline_(pipeline) {
     LOG_IF(FATAL, pipeline == nullptr) << "pipeline is null.";
   }
 
@@ -132,90 +125,37 @@ int main(int argc, char** argv) {
     flags to variables
   */
   std::list<std::string> video_urls = ::ReadFileList(FLAGS_data_path);
-  int parallelism = video_urls.size();
 
   /*
-    module configs
-  */
-  cnstream::CNModuleConfig source_config = {
-      "source", /*name*/
-      {
-          /*paramSet */
-          {"source_type", "ffmpeg"},
-          {"decoder_type", "mlu"},
-          {"device_id", std::to_string(FLAGS_device_id)},
-      },
-      0,                      /*parallelism*/
-      0,                      /*maxInputQueueSize, source module does not have input-queue at this moment*/
-      "cnstream::DataSource", /*className*/
-      {
-          /* next, downstream module names */
-          "infer",
-      }};
-  cnstream::CNModuleConfig detector_config = {"infer", /*name*/
-                                              {
-                                                  /*paramSet */
-                                                  {"model_path", FLAGS_model_path},
-                                                  {"func_name", "subnet0"},
-                                                  {"postproc_name", FLAGS_postproc_name},
-                                                  {"device_id", std::to_string(FLAGS_device_id)},
-                                              },
-                                              parallelism,            /*parallelism*/
-                                              20,                     /*maxInputQueueSize*/
-                                              "cnstream::Inferencer", /*className*/
-                                              {
-                                                  /* next, downstream module names */
-                                                  "tracker",
-                                              }};
-  cnstream::CNModuleConfig tracker_config = {"tracker", /*name*/
-                                             {
-                                                 /*paramSet */
-                                                 {"model_path", FLAGS_model_path_tracker},
-                                                 {"func_name", "subnet0"},
-                                             },
-                                             parallelism,         /*parallelism*/
-                                             20,                  /*maxInputQueueSize*/
-                                             "cnstream::Tracker", /*className*/
-                                             {
-                                                 /* next, downstream module names */
-                                                 "osd",
-                                             }};
-  cnstream::CNModuleConfig osd_config = {"osd", /*name*/
-                                         {
-                                             /*paramSet */
-                                             {"label_path", FLAGS_label_path},
-                                         },
-                                         parallelism,     /*parallelism*/
-                                         20,              /*maxInputQueueSize*/
-                                         "cnstream::Osd", /*className*/
-                                         {
-                                             /* next, downstream module names */
-                                             "encoder",
-                                         }};
-  cnstream::CNModuleConfig encoder_config = {"encoder", /*name*/
-                                             {
-                                                 /*paramSet */
-                                                 {"dump_dir", FLAGS_dump_dir},
-                                             },
-                                             parallelism,         /*parallelism*/
-                                             20,                  /*maxInputQueueSize*/
-                                             "cnstream::Encoder", /*className*/
-                                             {
-                                                 /* next, downstream module names */
-                                                 /*the last stage*/
-                                             }};
-
-  /*
-    create pipeline
+    build pipeline
   */
   cnstream::Pipeline pipeline("pipeline");
-  pipeline.BuildPipeine({source_config, detector_config, tracker_config, osd_config, encoder_config});
+  // pipeline.BuildPipeline({source_config, detector_config, tracker_config});
+
+  try {
+    if (0 != pipeline.BuildPipelineByJSONFile(FLAGS_config_fname)) {
+      LOG(ERROR) << "Build pipeline failed.";
+      return EXIT_FAILURE;
+    }
+  } catch (std::string &e) {
+    LOG(ERROR) << e;
+    return EXIT_FAILURE;
+  }
 
   /*
     message observer
    */
   MsgObserver msg_observer(static_cast<int>(video_urls.size()), &pipeline);
   pipeline.SetStreamMsgObserver(reinterpret_cast<cnstream::StreamMsgObserver*>(&msg_observer));
+
+  /*
+    find data source
+   */
+  cnstream::DataSource* source = dynamic_cast<cnstream::DataSource*>(pipeline.GetModule("source"));
+  if (nullptr == source) {
+    LOG(ERROR) << "DataSource module not found.";
+    return EXIT_FAILURE;
+  }
 
   /*
     start pipeline
@@ -228,7 +168,6 @@ int main(int argc, char** argv) {
   /*
     add stream sources...
   */
-  cnstream::DataSource* source = dynamic_cast<cnstream::DataSource*>(pipeline.GetModule(source_config.name));
   int streams = static_cast<int>(video_urls.size());
   auto url_iter = video_urls.begin();
   for (int i = 0; i < streams; i++, url_iter++) {
@@ -255,9 +194,10 @@ int main(int argc, char** argv) {
       std::this_thread::sleep_for(std::chrono::seconds(FLAGS_wait_time));
     } else {
       getchar();
-      for (int i = 0; i < streams; i++) {
-        source->RemoveSource(std::to_string(i));
-      }
+    }
+
+    for (int i = 0; i < streams; i++) {
+      source->RemoveSource(std::to_string(i));
     }
 
     pipeline.Stop();
@@ -267,6 +207,9 @@ int main(int argc, char** argv) {
     */
     if (FLAGS_wait_time) {
       std::this_thread::sleep_for(std::chrono::seconds(FLAGS_wait_time));
+      for (int i = 0; i < streams; i++) {
+        source->RemoveSource(std::to_string(i));
+      }
       pipeline.Stop();
     } else {
       msg_observer.WaitForStop();

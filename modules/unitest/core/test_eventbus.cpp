@@ -43,7 +43,7 @@ EventHandleFlag TestBusWatcher(const Event &event, Module *module) {
   return EVENT_HANDLE_SYNCED;
 }
 
-TEST(CoreEventBus, TestAddBusWatcher) {
+TEST(CoreEventBus, AddBusWatcher) {
   Pipeline pipe("pipe");
   auto bus = pipe.GetEventBus();
   uint32_t num = bus->AddBusWatch(TestBusWatcher, &pipe);
@@ -53,7 +53,7 @@ TEST(CoreEventBus, TestAddBusWatcher) {
   pipe.Stop();
 }
 
-TEST(CoreEventBus, TestPostEvent) {
+TEST(CoreEventBus, PostEvent) {
   Pipeline pipe("pipe");
   auto bus = pipe.GetEventBus();
   bus->AddBusWatch(TestBusWatcher, &pipe);
@@ -70,7 +70,7 @@ TEST(CoreEventBus, TestPostEvent) {
   pipe.Stop();
 }
 
-TEST(CoreEventBus, TestPollEvent) {
+TEST(CoreEventBus, PollEvent) {
   Pipeline pipe("pipe");
   auto bus = pipe.GetEventBus();
   Event event;
@@ -87,6 +87,16 @@ TEST(CoreEventBus, TestPollEvent) {
   EXPECT_EQ(poll_e.message, event.message);
   EXPECT_EQ(poll_e.module, event.module);
   pipe.Stop();
+}
+
+TEST(CoreEventBus, ClearAllBusWatchers) {
+  Pipeline pipe("pipe");
+  auto bus = pipe.GetEventBus();
+  EXPECT_EQ(bus->GetBusWatchers().size(), uint32_t(1));
+  bus->AddBusWatch(TestBusWatcher, &pipe);
+  EXPECT_EQ(bus->GetBusWatchers().size(), uint32_t(2));
+  bus->ClearAllWatchers();
+  EXPECT_EQ(bus->GetBusWatchers().size(), uint32_t(0));
 }
 
 }  // namespace cnstream

@@ -19,6 +19,7 @@
  *************************************************************************/
 
 #include "data_handler.hpp"
+#include "fr_controller.hpp"
 #include "glog/logging.h"
 
 namespace cnstream {
@@ -40,16 +41,77 @@ size_t DataHandler::GetStreamIndex() {
       return i;
     }
   }
-  streamIndex_ = INVALID_STREAM_ID;
-  return -1;
+  return INVALID_STREAM_ID;
 }
 
-void DataHandler::ReturnStreamIndex() {
+void DataHandler::ReturnStreamIndex() const {
   std::unique_lock<std::mutex> lock(index_mutex_);
   if (streamIndex_ < 0 || streamIndex_ >= sizeof(index_mask_) * 8) {
     return;
   }
   index_mask_ &= ~((uint64_t)1 << streamIndex_);
+}
+
+bool DataHandler::Open() {
+  if (!this->module_) {
+    return false;
+  }
+
+  // default value
+  dev_ctx_.dev_type = DevContext::MLU;
+  dev_ctx_.dev_id = 0;
+
+  // updated with paramSet
+  param_ = module_->GetSourceParam();
+  if (param_.output_type_ == OUTPUT_CPU) {
+    dev_ctx_.dev_type = DevContext::CPU;
+    dev_ctx_.dev_id = -1;
+  } else if (param_.output_type_ == OUTPUT_MLU) {
+    dev_ctx_.dev_type = DevContext::MLU;
+    dev_ctx_.dev_id = param_.device_id_;
+  } else {
+    return false;
+  }
+
+  size_t chn_idx = this->GetStreamIndex();
+  if (chn_idx == DataHandler::INVALID_STREAM_ID) {
+    return false;
+  }
+  dev_ctx_.ddr_channel = chn_idx % 4;
+
+  this->interval_ = param_.interval_;
+
+  // start demuxer
+  running_.store(1);
+  thread_ = std::move(std::thread(&DataHandler::Loop, this));
+  return true;
+}
+
+void DataHandler::Close() {
+  if (running_.load()) {
+    running_.store(0);
+    if (thread_.joinable()) {
+      thread_.join();
+    }
+  }
+}
+
+void DataHandler::Loop() {
+  if (!PrepareResources()) {
+    return;
+  }
+
+  FrController controller(frame_rate_);
+  if (frame_rate_ > 0) controller.Start();
+
+  while (running_.load()) {
+    if (!this->Process()) {
+      break;
+    }
+    if (frame_rate_ > 0) controller.Control();
+  }
+
+  ClearResources();
 }
 
 }  // namespace cnstream

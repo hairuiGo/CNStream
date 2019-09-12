@@ -26,6 +26,7 @@
 #include <vector>
 
 #include "cnbase/reflex_object.h"
+#include "cninfer/model_loader.h"
 
 #include "cnstream_frame.hpp"
 
@@ -43,10 +44,14 @@ class Postproc {
   /******************************************************************************
    * @brief Execute postproc on neural network outputs
    * @param
-   *   nn_outputs: neural network outputs, float* for output, uint64_t for length
+   *   net_outputs: neural network outputs
+   *   model: model information(you can get input shape and output shape from model)
    *   package: smart pointer of struct to store processed result
+   * @return return 0 if succeed
    ******************************************************************************/
-  virtual void Execute(std::vector<std::pair<float*, uint64_t>> nn_outputs, CNFrameInfoPtr package) = 0;
+  virtual int Execute(const std::vector<float*>& net_outputs,
+      const std::shared_ptr<libstream::ModelLoader>& model,
+      const CNFrameInfoPtr& package) = 0;
 
  protected:
   float threshold_ = 0;
@@ -54,9 +59,11 @@ class Postproc {
 
 class PostprocSsd : public Postproc, virtual public libstream::ReflexObjectEx<Postproc> {
  public:
-  void Execute(std::vector<std::pair<float*, uint64_t>> net_outputs, CNFrameInfoPtr package) override;
+  int Execute(const std::vector<float*>& net_outputs,
+      const std::shared_ptr<libstream::ModelLoader>& model,
+      const CNFrameInfoPtr& package) override;
 
-  DECLARE_REFLEX_OBJECT_EX(SsdPostproc, Postproc)
+  DECLARE_REFLEX_OBJECT_EX(PostprocSsd, Postproc)
 };  // class PostprocSsd
 
 }  // namespace cnstream

@@ -21,10 +21,12 @@ project(CNStream C CXX)
 # ---[ Options
 option(cnstream_build_tests "build all of modules' unit test" OFF)
 option(cnstream_build_samples "build sample programs" ON)
+option(cnstream_build_apps "build apps" ON)
 option(cnstream_build_integrated_lib "build modules into one library" ON)
 option(cnstream_build_test_coverage  "Test code coverage" OFF)
 option(RELEASE "build type" ON)
 option(WITH_FFMPEG "with ffmpeg" ON)
+option(WITH_OPENCV "with opencv" ON)
 
 include(CheckCXXCompilerFlag)
 CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
@@ -76,17 +78,43 @@ endif()
 include_directories("$ENV{NEUWARE_HOME}/include")
 link_directories("$ENV{NEUWARE_HOME}/lib64")
 
+# ---[ Google-gflags
+include("${PROJECT_SOURCE_DIR}/cmake/FindGFlags.cmake")
+list(APPEND 3RDPARTY_INCLUDE_DIRS ${GFLAGS_INCLUDE_DIRS})
+list(APPEND 3RDPARTY_LIBS ${GFLAGS_LIBRARIES})
+
+# ---[ Google-glog
+include("${PROJECT_SOURCE_DIR}/cmake/FindGlog.cmake")
+list(APPEND 3RDPARTY_INCLUDE_DIRS ${GLOG_INCLUDE_DIRS})
+list(APPEND 3RDPARTY_LIBS ${GLOG_LIBRARIES})
+
+##OpenCV
+if(WITH_OPENCV)
+  set(OpenCV_FIND_QUIETLY true)
+  #find_package(OpenCV REQUIRED) //this will include opencv_ts which result in crash on centos
+  find_package(OpenCV OPTIONAL_COMPONENTS imgcodecs)
+  set(imgcodecs_libs ${OpenCV_LIBS})
+  find_package(OpenCV REQUIRED core imgproc highgui features2d)
+  if(OpenCV_FOUND)
+    message(STATUS "OpenCV Found")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DHAVE_OPENCV")
+  endif()
+  if(imgcodecs_FOUND)
+    list(APPEND OpenCV_LIBS imgcodecs_libs)
+  endif()
+endif()
+
 ##FFmpeg
-if(WITH_FFMPEG)  
+if(WITH_FFMPEG)
   set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
   find_package(FFmpeg REQUIRED)
   if (FFMPEG_FOUND)
-    include_directories(${FFMPEG_INCLUDE_DIR})    
+    include_directories(${FFMPEG_INCLUDE_DIR})
     message(STATUS "ffmpeg include: ${FFMPEG_INCLUDE_DIR}")
     message(STATUS "ffmpeg libraries: ${FFMPEG_LIBRARIES}")
     set(HAVE_FFMPEG true)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DHAVE_FFMPEG")   
-    message(STATUS "HAVE_FFMPEG enabled")    
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DHAVE_FFMPEG")
+    message(STATUS "HAVE_FFMPEG enabled")
   else (FFMPEG_FOUND)
     message(FATAL_ERROR "Can't find FFmpeg libs!")
     set (HAVE_FFMPEG false)
@@ -100,6 +128,9 @@ link_directories(${PROJECT_SOURCE_DIR}/mlu/${MLU_PLATFORM}/libs/${CMAKE_SYSTEM_P
 
 # ---[ Includes
 include_directories(${PROJECT_SOURCE_DIR}/modules/core/include)
+
+# ---[ Rapidjson
+include_directories(${PROJECT_SOURCE_DIR}/3rdparty/rapidjson/include)
 
 if(cnstream_build_tests)
   add_definitions(-DUNIT_TEST)
@@ -116,3 +147,9 @@ if(cnstream_build_samples)
   add_subdirectory(samples)
 endif()
 
+if(EXISTS ${PROJECT_SOURCE_DIR}/apps)
+  if(cnstream_build_apps)
+    message(STATUS "generate apps' makefile")
+    add_subdirectory(apps)
+  endif()
+endif()

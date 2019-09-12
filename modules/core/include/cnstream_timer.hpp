@@ -34,15 +34,30 @@ class CNTimer {
  public:
   void Dot(uint32_t cnt_step);
   /**************************************************************
+   * @brief record one step time info
    * @param
-   *   [time]: the cost time in ms of a cnt_step.
-   *   [cnt_step]: tensor step. As a tensor contains batch frames,
+   *   time[in]: the cost time in ms of a cnt_step.
+   *   cnt_step[in]: process step. As once processing batch frames,
    *               in most case, cnt_step is equal to batch size.
    **************************************************************/
   void Dot(double time, uint32_t cnt_step);
-  void PrintFps(std::string head) const;
+  /**************************************************************
+   * @brief calculate and print fps
+   * @param
+   *   head[in]: print head string before fps information
+   **************************************************************/
+  void PrintFps(const std::string &head) const;
+  /**************************************************************
+   * @brief clear all record
+   **************************************************************/
   void Clear();
+  /**************************************************************
+   * @brief mix other record into this timer
+   **************************************************************/
   void MixUp(const CNTimer& other);
+  /**************************************************************
+   * @brief get average cost time one step
+   **************************************************************/
   double GetAvg() const;
 
  private:

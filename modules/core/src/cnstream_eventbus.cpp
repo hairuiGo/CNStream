@@ -30,9 +30,8 @@ namespace cnstream {
 
 class EventBusPrivate {
  private:
-  EventBusPrivate(EventBus *d) : q_ptr_(d) {}
+  explicit EventBusPrivate(EventBus *d) : q_ptr_(d) {}
 
-  EventBus *q_ptr_;
   ThreadSafeQueue<Event> queue_;
   std::list<std::pair<BusWatcher, Module *>> bus_watchers_;
 

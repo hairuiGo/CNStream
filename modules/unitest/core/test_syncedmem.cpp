@@ -39,14 +39,14 @@ static struct {
   bool used_mlu = false;
 } g_last_data;
 
-TEST(CoreSyncedMem, CoreSyncedMem) {
+TEST(CoreSyncedMem, SyncedMem) {
   cnrtRet_t ret = cnrtInit(0);
   if (CNRT_RET_SUCCESS != ret) {
     LOG(WARNING) << "CnrtInit failed. error code:" << ret;
   }
   time_t t;
   t = time(NULL);
-  std::cout << std::put_time(std::localtime(&t), "%Y-%m-%d %H.%M.%S") << std::endl;
+  // std::cout << std::put_time(std::localtime(&t), "%Y-%m-%d %H.%M.%S") << std::endl;
 
   std::default_random_engine random_engine(t);
   std::uniform_int_distribution<size_t> memory_random_number_generator(0, 64 * 1024);
@@ -161,5 +161,5 @@ TEST(CoreSyncedMem, CoreSyncedMem) {
   std::cout << "[Total Test count] [" << total_test_function_number << "]" << std::endl;
 
   t = time(NULL);
-  std::cout << std::put_time(std::localtime(&t), "%Y-%m-%d %H.%M.%S") << std::endl;
+//  std::cout << std::put_time(std::localtime(&t), "%Y-%m-%d %H.%M.%S") << std::endl;
 }

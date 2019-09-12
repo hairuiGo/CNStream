@@ -24,17 +24,19 @@
 #include <stdexcept>
 #include <string>
 
+/// registor exception class derived from CnstreamError
 #define CNSTREAM_REGISTER_EXCEPTION(CNAME)                         \
   class CNAME##Error : public cnstream::CnstreamError {            \
    public:                                                         \
-    explicit CNAME##Error(std::string msg) : CnstreamError(msg) {} \
+    explicit CNAME##Error(const std::string &msg) : CnstreamError(msg) {} \
   };
 
 namespace cnstream {
 
+/// cnstream base exception class, derived from runtime_error
 class CnstreamError : public std::runtime_error {
  public:
-  explicit CnstreamError(std::string msg) : std::runtime_error(msg) {}
+  explicit CnstreamError(const std::string &msg) : std::runtime_error(msg) {}
 };  // class CnstreamError
 
 }  // namespace cnstream

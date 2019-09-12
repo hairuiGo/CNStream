@@ -20,16 +20,10 @@ source env.sh
 mkdir -p output
 ./../bin/detection  \
     --data_path ./files.list_video \
-    --drop_rate 0     \
     --src_frame_rate 27   \
     --wait_time 0 \
     --rtsp=false \
     --input_image=false \
-    --dump_dir "output" \
-    --label_path ../data/models/MLU100/Primary_Detector/resnet34ssd/label_voc.txt \
     --loop=false \
-    --model_path ../data/models/MLU100/Primary_Detector/resnet34ssd/resnet34_ssd.cambricon \
-    --model_path_tracker ../data/models/MLU100/Deepsort/deepsort.cambricon \
-    --postproc_name PostprocSsd \
-    --device_id 0 \
+    --config_fname "detection_config.json" \
     --alsologtostderr

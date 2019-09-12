@@ -9,6 +9,7 @@ CNStream provides following plug-in modules:
 - osd (On-screen display): Module for highlighting objects and text overlay.
 - encode: Encodes on CPU.
 - display: Display the video on screen
+- tracker: Multi object tracking
 
 ## **Cambricon Dependencies** ##
 
@@ -113,7 +114,7 @@ After finished prerequiste, you can build instructions with the following steps:
 
       ```bash
       cd /usr/local/neuware/lib64
-      rm libcnbase.so libcndecode.so libcnencode.so libcninfer.so libcnosd.so libcnpostproc.so libcnpreproc.so libcnstream.so libcntiler.so libcntrack.so
+      rm libcnbase.so libcndecode.so libcnencode.so libcninfer.so libcnosd.so libcnpostproc.so libcnpreproc.so libcnstream.so libcntiler.so libcntrack.so libcnstream-toolkit.so
       ```
   3. Follow the steps above to build the instructions again.
 
@@ -123,7 +124,7 @@ If you still have questions, go to <http://forum.cambricon.com> to get more help
 
 ### **Demo Overview** ###
 
-The samples/demo is a cnstream-based target detection demo, which includes the following Plug-in modules：
+The samples/detection-demo is a cnstream-based target detection demo, which includes the following Plug-in modules：
 
 - source: With MLU to decode video streams, such as local video files, rtmp, and rtsp.
 - inferencer: With MLU for Neural Network Inferencing.
@@ -132,8 +133,8 @@ The samples/demo is a cnstream-based target detection demo, which includes the f
 
 
 In this demo, resnet34_ssd.cambricon that is an offline model used for inference.
-Output AVI file is in cnstream/samples/demo/output directory. The output directory can be specified by the [dump_dir] parameter.
-in addition,See the comments in cnstream/samples/demo/run.sh for details.)
+Output AVI file is in cnstream/samples/detection-demo/output directory. The output directory can be specified by the [dump_dir] parameter.
+in addition,See the comments in cnstream/samples/detection-demo/run.sh for details.)
 
 ### **Run samples** ###
 

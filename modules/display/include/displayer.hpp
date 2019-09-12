@@ -28,40 +28,77 @@
 
 #include "cnstream_frame.hpp"
 #include "cnstream_module.hpp"
-#include "display_stream.hpp"
 
 namespace cnstream {
 
+/// Pointer for frame info 
 using CNFrameInfoPtr = std::shared_ptr<cnstream::CNFrameInfo>;
 
+class DisplayStream;
+
+/**
+ * @brief Displayer is a module for displaying the vedio
+ */
 class Displayer : public Module, public ModuleCreator<Displayer> {
  public:
+ 
+ /** 
+   *  @brief  Generate Displayer
+   *
+   *  @param  Name : module name
+   *
+   *  @return None
+   */
   explicit Displayer(const std::string& name);
+  
+ /** 
+   *  @brief  Release Displayer
+   *
+   *  @param  None
+   *
+   *  @return None
+   */
   ~Displayer();
 
-  /*
+  /**
    * @brief Called by pipeline when pipeline start.
-   * @paramSet
-   *   window-width: display window width
-   *   window-height: display window height
-   *   cols: display image columns
-   *   rows: display image rows
-   *   display-rate: display refresh rate
+   *
+   * @param paramSet :
+   @verbatim
+      window-width: display window width
+      window-height: display window height
+      cols: display image columns
+      rows: display image rows
+      refresh-rate: display refresh rate
+   @endverbatim
+   *
+   * @return if module open succeed
    */
   bool Open(ModuleParamSet paramSet) override;
 
-  /*
-   * @brief Called by pipeline when pipeline stop.
-   */
+  /**
+	* @brief  Called by pipeline when pipeline stop
+	*
+	* @param  None
+	*
+	* @return  None
+	*/
+	
   void Close() override;
 
-  /*
+  /**
    * @brief display each frame
+   *
+   * @param data : data to be processed
+   *
+   * @return whether process succeed
+   * @retval 0: succeed and do no intercept data
+   * @retval <0: failed
    */
   int Process(CNFrameInfoPtr data) override;
 
  private:
-  DisplayStream stream_;
+  DisplayStream* stream_;
 };  // class Displayer
 
 }  // namespace cnstream

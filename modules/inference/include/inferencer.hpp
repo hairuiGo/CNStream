@@ -26,12 +26,6 @@
 #include <thread>
 #include <vector>
 
-#include "cninfer/cninfer.h"
-#include "cninfer/mlu_context.h"
-#include "cninfer/mlu_memory_op.h"
-#include "cninfer/model_loader.h"
-#include "cnpreproc/resize_and_colorcvt.h"
-
 #include "cnstream_error.hpp"
 #include "cnstream_module.hpp"
 
@@ -90,7 +84,6 @@ class Inferencer : public Module, public ModuleCreator<Inferencer> {
   int ProcessBatch();
 
  protected:
-  InferencerPrivate* d_ptr_ = nullptr;
   DECLARE_PRIVATE(d_ptr_, Inferencer);
 };  // class Inferencer
 

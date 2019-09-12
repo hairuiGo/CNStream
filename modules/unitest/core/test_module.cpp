@@ -40,7 +40,17 @@ class TestModuleBase : public Module {
   int Process(std::shared_ptr<CNFrameInfo> data) { return 0; }
 };
 
-TEST(CoreModule, SetName) {
+class TestModuleBaseEx : public ModuleEx {
+ public:
+  TestModuleBaseEx() : ModuleEx("test-module-base") {}
+  ~TestModuleBaseEx() {}
+
+  bool Open(ModuleParamSet set) { return true; }
+  void Close() {}
+  int Process(std::shared_ptr<CNFrameInfo> data) { return 0; }
+};
+
+TEST(CoreModule, SetGetName) {
   TestModuleBase module;
 
   uint32_t seed = (uint32_t)time(0);
@@ -54,7 +64,7 @@ TEST(CoreModule, SetName) {
   }
 }
 
-TEST(CoreModule, TestOpenCloseProcess) {
+TEST(CoreModule, OpenCloseProcess) {
   TestModuleBase module;
   ModuleParamSet params;
   EXPECT_TRUE(module.Open(params));
@@ -62,7 +72,7 @@ TEST(CoreModule, TestOpenCloseProcess) {
   module.Process(nullptr);
 }
 
-TEST(CoreModule, TestMask) {
+TEST(CoreModule, ModuleMask) {
   uint32_t seed = (uint32_t)time(0);
   const uint32_t mask_len = 32;
   TestModuleBase module;
@@ -80,6 +90,13 @@ TEST(CoreModule, TestMask) {
   }
   EXPECT_EQ(module.GetModulesMask(), mask);
   module.Close();
+}
+
+TEST(CoreModule, TransmitAttr) {
+  TestModuleBase module;
+  EXPECT_FALSE(module.hasTranmit());
+  TestModuleBaseEx module_ex;
+  EXPECT_TRUE(module_ex.hasTranmit());
 }
 
 }  // namespace cnstream

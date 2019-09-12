@@ -74,12 +74,10 @@ class Connector {
 
   void Start();
   void Stop();
-  bool IsStopped();
+  bool IsStopped() const;
   void EmptyDataQueue();
 
  private:
-  ConnectorPrivate* d_ptr_;
-
   DECLARE_PRIVATE(d_ptr_, Connector);
   DISABLE_COPY_AND_ASSIGN(Connector);
 };  // class Connector

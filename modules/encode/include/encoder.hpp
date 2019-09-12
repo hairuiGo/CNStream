@@ -21,43 +21,83 @@
 #ifndef ENCODER_HPP_
 #define ENCODER_HPP_
 
-#include <opencv2/opencv.hpp>
-
 #include <memory>
 #include <string>
 #include <unordered_map>
-
+#ifdef HAVE_OPENCV
+  #include <opencv2/opencv.hpp>
+#else
+  #error OpenCV required
+#endif
 #include "cnstream_frame.hpp"
 #include "cnstream_module.hpp"
 
 namespace cnstream {
 
+/// Pointer for frame info
 using CNFrameInfoPtr = std::shared_ptr<cnstream::CNFrameInfo>;
 
+
+
+/**
+ * @brief Encoder context structer
+ */
 struct EncoderContext {
   cv::VideoWriter writer;
   cv::Size size;
 };
 
+/**
+ * @brief Encoder is a module for encode the video or image.
+ */
 class Encoder : public Module, public ModuleCreator<Encoder> {
  public:
+  /** 
+   *  @brief  Generate Encoder
+   *
+   *  @param  Name : module name
+   *
+   *  @return None
+   */
   explicit Encoder(const std::string& name);
+  /** 
+   *  @brief  Release Encoder
+   *
+   *  @param  None
+   *
+   *  @return None
+   */
   ~Encoder();
 
-  /*
+   /**
    * @brief Called by pipeline when pipeline start.
-   * @paramSet
-   *   dump_dir: ouput_dir path
+   *
+   * @param paramSet :
+   @verbatim
+   dump_dir: ouput_dir 
+   @endverbatim
+   *
+   * @return if module open succeed
    */
   bool Open(ModuleParamSet paramSet) override;
 
-  /*
-   * @brief Called by pipeline when pipeline stop.
-   */
+  /**
+	* @brief  Called by pipeline when pipeline stop
+	*
+	* @param  None
+	*
+	* @return  None
+	*/
   void Close() override;
 
-  /*
-   * @brief do encode for each frame
+ /**
+   * @brief Encode each frame
+   *
+   * @param data : data to be processed
+   *
+   * @return whether process succeed
+   * @retval 0: succeed and do no intercept data
+   * @retval <0: failed
    */
   int Process(CNFrameInfoPtr data) override;
 

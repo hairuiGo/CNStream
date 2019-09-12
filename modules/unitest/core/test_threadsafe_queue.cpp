@@ -35,7 +35,7 @@ namespace cnstream {
 std::mutex data_mutex_;
 bool flag_[100];
 
-void thread_func_push(ThreadSafeQueue<int>* thread_safe_queue, int data) {
+void ThreadFuncPush(ThreadSafeQueue<int>* thread_safe_queue, int data) {
   std::lock_guard<std::mutex> lk(data_mutex_);
   thread_safe_queue->Push(data);
   flag_[data] = true;
@@ -43,7 +43,7 @@ void thread_func_push(ThreadSafeQueue<int>* thread_safe_queue, int data) {
   // cout << "--Test Push:" << data++ << endl;
 }
 
-void thread_func_try_pop(ThreadSafeQueue<int>* thread_safe_queue) {
+void ThreadFuncTryPop(ThreadSafeQueue<int>* thread_safe_queue) {
   int value = -1;
   bool res = thread_safe_queue->TryPop(value);
   std::lock_guard<std::mutex> lk(data_mutex_);
@@ -53,7 +53,7 @@ void thread_func_try_pop(ThreadSafeQueue<int>* thread_safe_queue) {
   }
 }
 
-void thread_func_wait_and_pop(ThreadSafeQueue<int>* thread_safe_queue) {
+void ThreadFuncWaitAndPop(ThreadSafeQueue<int>* thread_safe_queue) {
   int value = -1;
   thread_safe_queue->WaitAndPop(value);
   std::lock_guard<std::mutex> lk(data_mutex_);
@@ -61,7 +61,7 @@ void thread_func_wait_and_pop(ThreadSafeQueue<int>* thread_safe_queue) {
   flag_[value] = false;
 }
 
-void thread_func_wait_and_try_pop(ThreadSafeQueue<int>* thread_safe_queue) {
+void ThreadFuncWaitAndTryPop(ThreadSafeQueue<int>* thread_safe_queue) {
   int value = -1;
   bool res = thread_safe_queue->WaitAndTryPop(value, std::chrono::microseconds(50));
   std::lock_guard<std::mutex> lk(data_mutex_);
@@ -71,7 +71,7 @@ void thread_func_wait_and_try_pop(ThreadSafeQueue<int>* thread_safe_queue) {
   }
 }
 
-bool test_threadsafe_queue() {
+bool TestThreadsafeQueue() {
   ThreadSafeQueue<int> thread_safe_queue;
   memset(flag_, 0, sizeof(flag_));
   std::thread* threads[100];
@@ -88,20 +88,20 @@ bool test_threadsafe_queue() {
   LOG(INFO) << "Test threadsafe_queue: push and pop!";
   while (++i < 40) {
     if (i > 20) {
-      threads[i] = new std::thread(thread_func_push, &thread_safe_queue, data[i]);
+      threads[i] = new std::thread(ThreadFuncPush, &thread_safe_queue, data[i]);
     } else {
       switch (rand_r(&seed) % 4) {
         case 0:
-          threads[i] = new std::thread(thread_func_try_pop, &thread_safe_queue);
+          threads[i] = new std::thread(ThreadFuncTryPop, &thread_safe_queue);
           break;
         case 1:
-          threads[i] = new std::thread(thread_func_wait_and_pop, &thread_safe_queue);
+          threads[i] = new std::thread(ThreadFuncWaitAndPop, &thread_safe_queue);
           break;
         case 2:
-          threads[i] = new std::thread(thread_func_wait_and_try_pop, &thread_safe_queue);
+          threads[i] = new std::thread(ThreadFuncWaitAndTryPop, &thread_safe_queue);
           break;
         case 3:
-          threads[i] = new std::thread(thread_func_push, &thread_safe_queue, data[i]);
+          threads[i] = new std::thread(ThreadFuncPush, &thread_safe_queue, data[i]);
           break;
         default:
           break;
@@ -118,16 +118,16 @@ bool test_threadsafe_queue() {
     if (i < 55) {
       switch (rand_r(&seed) % 2) {
         case 0:
-          threads[i] = new std::thread(thread_func_wait_and_pop, &thread_safe_queue);
+          threads[i] = new std::thread(ThreadFuncWaitAndPop, &thread_safe_queue);
           break;
         case 1:
-          threads[i] = new std::thread(thread_func_wait_and_try_pop, &thread_safe_queue);
+          threads[i] = new std::thread(ThreadFuncWaitAndTryPop, &thread_safe_queue);
           break;
         default:
           break;
       }
     } else {
-      threads[i] = new std::thread(thread_func_push, &thread_safe_queue, data[i]);
+      threads[i] = new std::thread(ThreadFuncPush, &thread_safe_queue, data[i]);
     }
   }
   for (int k = 40; k < 70; ++k) {
@@ -139,6 +139,6 @@ bool test_threadsafe_queue() {
   return true;
 }
 
-TEST(CoreThreadSafeQueue, test_threadsafe_queue) { EXPECT_EQ(true, test_threadsafe_queue()); }
+TEST(CoreThreadSafeQueue, ThreadsafeQueue) { EXPECT_EQ(true, TestThreadsafeQueue()); }
 
 }  // namespace cnstream

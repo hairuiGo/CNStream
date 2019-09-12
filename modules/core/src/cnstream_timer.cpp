@@ -61,7 +61,7 @@ void CNTimer::Dot(double time, uint32_t cnt_step) {
   avg_ /= cnt_;
 }
 
-void CNTimer::PrintFps(std::string head) const {
+void CNTimer::PrintFps(const std::string &head) const {
   double fps = avg_ != 0 ? 1e3 / avg_ : 0.0f;
   std::cout << head << "avg : " << avg_ << "ms"
             << " fps : " << fps << " frame count : " << cnt_ << std::endl;

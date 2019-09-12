@@ -47,23 +47,25 @@ void Postproc::set_threshold(const float threshold) { threshold_ = threshold; }
 
 IMPLEMENT_REFLEX_OBJECT_EX(PostprocSsd, Postproc)
 
-void PostprocSsd::Execute(std::vector<std::pair<float*, uint64_t>> net_outputs, CNFrameInfoPtr package) {
+int PostprocSsd::Execute(const std::vector<float*>& net_outputs,
+      const std::shared_ptr<libstream::ModelLoader>& model,
+      const CNFrameInfoPtr& package) {
   if (net_outputs.size() != 1) {
     cerr << "[Warnning] Ssd neuron network only has one output,"
             " but get " +
                 to_string(net_outputs.size()) + "\n";
-    return;
+    return -1;
   }
 
-  auto data = net_outputs[0].first;
-  auto len = net_outputs[0].second;
+  auto data = net_outputs[0];
+  auto len = model->output_shapes()[0].DataCount();
   auto box_num = len / 6;
 
   if (len % 6 != 0) {
     cerr << "[Warnning] The output of the ssd is a multiple of 6, but "
             " the number is " +
                 to_string(len) + "\n";
-    return;
+    return -1;
   }
 
   auto pxmin = data;
@@ -98,6 +100,7 @@ void PostprocSsd::Execute(std::vector<std::pair<float*, uint64_t>> net_outputs, 
     obj->bbox.h = h;
     package->objs.push_back(obj);
   }
+  return 0;
 }
 
 }  // namespace cnstream

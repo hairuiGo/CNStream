@@ -4,12 +4,9 @@ set(CNSTREAM_TARGET_SOVERSION 4)
 set(CNSTREAM_TARGET_VERSION 4.0)
 add_definitions(-DCNSTREAM_VERSION=${CNSTREAM_TARGET_VERSION})
 
-include_directories(${PROJECT_SOURCE_DIR}/3rdparty/deepsort/include)
 include_directories(${PROJECT_SOURCE_DIR}/3rdparty/googletest/include/)
 
 set(module_list core inference encode source osd track display)
-
-find_package(OpenCV REQUIRED)
 
 if(cnstream_build_integrated_lib)
   if(HAVE_FFMPEG)
@@ -22,7 +19,7 @@ if(cnstream_build_integrated_lib)
   endforeach()
   add_library(cnstream SHARED ${srcs})
   include_directories(${OpenCV_INCLUDE_DIRS})
-  target_link_libraries(cnstream cnbase cnpreproc cnpostproc cndecode cninfer cnosd cncodec cnrt cntrack deepsort ${OpenCV_LIBS} ${SOURCE_LINKER_LIBS})
+  target_link_libraries(cnstream cnrt cnstream-toolkit ${OpenCV_LIBS} ${SOURCE_LINKER_LIBS})
   set_target_properties(cnstream PROPERTIES VERSION ${CNSTREAM_TARGET_VERSION} SOVERSION ${CNSTREAM_TARGET_SOVERSION})
 else()
   add_subdirectory(core)

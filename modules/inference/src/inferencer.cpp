@@ -97,10 +97,10 @@ class InferencerPrivate {
     uint32_t w, h, stride;
     pctx->rc_op.get_src_resolution(&w, &h, &stride);
     if (static_cast<int>(w) != data->frame.width || static_cast<int>(h) != data->frame.height ||
-        static_cast<int>(stride) != data->frame.strides[0] ||
+        static_cast<int>(stride) != data->frame.stride[0] ||
         FMTCONVERT2CMODE(data->frame.fmt) != pctx->rc_op.color_mode()) {
       pctx->rc_op.Destroy();
-      pctx->rc_op.set_src_resolution(data->frame.width, data->frame.height, data->frame.strides[0]);
+      pctx->rc_op.set_src_resolution(data->frame.width, data->frame.height, data->frame.stride[0]);
       pctx->rc_op.set_cmode(FMTCONVERT2CMODE(data->frame.fmt));
       bool ret = pctx->rc_op.Init();
       LOG_IF(FATAL, !ret);
@@ -152,7 +152,6 @@ class InferencerPrivate {
     }
     return pctx;
   }
-  Inferencer* q_ptr_ = nullptr;
   DECLARE_PUBLIC(q_ptr_, Inferencer);
 
 };  // class InferencerPrivate
@@ -244,8 +243,7 @@ int Inferencer::Process(CNFrameInfoPtr data) {
     /* EOS, process batched data and transmit eos */
     int ret = ProcessBatch();
     pctx->vec_data.clear();
-    if (container_)
-      container_->ProvideData(this, data);
+    if (container_) container_->ProvideData(this, data);
     return ret;
   } else {
     /* normal data, do preprocessing and batch it */
@@ -254,32 +252,58 @@ int Inferencer::Process(CNFrameInfoPtr data) {
 
     if (d_ptr_->cpu_preproc_.get() != nullptr) {
       /* preprocessing use cpu */
-      std::vector<std::pair<float*, libstream::CnShape>> nn_inputs;  // neuron network inputs
+      std::vector<float*> net_inputs;  // neuron network inputs
       for (size_t input_i = 0; input_i < shapes.size(); ++input_i) {
         uint64_t offset = shapes[input_i].DataCount();
-        auto pair =
-            std::make_pair(reinterpret_cast<float*>(pctx->cpu_input[input_i]) + input_i * offset, shapes[input_i]);
-        nn_inputs.push_back(pair);
+        net_inputs.push_back(reinterpret_cast<float*>(pctx->cpu_input[input_i]) + input_i * offset);
       }
-      d_ptr_->cpu_preproc_->Execute(data, nn_inputs);
+      d_ptr_->cpu_preproc_->Execute(net_inputs, d_ptr_->model_loader_, data);
     } else {
       /* preprocessing use mlu */
-      try {
-        d_ptr_->CheckAndUpdateRCOp(data);
+
+      const CNDataFormat fmt = data->frame.fmt;
+      switch (fmt) {
+      case CNDataFormat::CN_PIXEL_FORMAT_YUV420_NV21:
+      case CNDataFormat::CN_PIXEL_FORMAT_YUV420_NV12: {
         unsigned int offset = 0;
         cnrtRet_t ret = cnrtGetMemcpyBatchAlignment(d_ptr_->model_loader_->input_desc_array()[0], &offset);
-        LOG_IF(FATAL, CNRT_RET_SUCCESS != ret);
+        CHECK_EQ(CNRT_RET_SUCCESS, ret);
         void* output_data =
             reinterpret_cast<void*>(reinterpret_cast<uint64_t>(pctx->mlu_input[0]) + offset * batch_index);
         void* plane_y = data->frame.data[0]->GetMutableMluData();
         void* plane_uv = data->frame.data[1]->GetMutableMluData();
-        pctx->rc_op.InvokeOp(output_data, plane_y, plane_uv);
-        ret = cnrtSyncStream(pctx->rc_op.cnrt_stream());
-        if (CNRT_RET_SUCCESS != ret) {
-          throw libstream::StreamlibsError("mlu preprocess failed. error code: " + std::to_string(ret));
+        if (d_ptr_->model_loader_->WithYUVInput()) {
+          CHECK_EQ(d_ptr_->model_loader_->input_shapes()[0].w(), static_cast<uint32_t>(data->frame.width))
+            << "Your offline model can not deal with this frame, frame size mismatch.";
+          CHECK_EQ(d_ptr_->model_loader_->input_shapes()[0].h(), static_cast<uint32_t>(data->frame.height * 1.5))
+            << "Your offline model can not deal with this frame, frame size mismatch.";
+          // yuv, copy to batch memory
+          ret = cnrtMemcpy(output_data, plane_y, data->frame.GetPlaneBytes(0), CNRT_MEM_TRANS_DIR_DEV2DEV);
+          CHECK_EQ(CNRT_RET_SUCCESS, ret) << "offset:" << offset << " output data:" << output_data
+            << " plane_y:" << plane_y << " plane bytes: " << data->frame.GetPlaneBytes(0);
+          output_data =
+            reinterpret_cast<void*>(reinterpret_cast<uint64_t>(output_data) + data->frame.GetPlaneBytes(0));
+          ret = cnrtMemcpy(output_data, plane_uv, data->frame.GetPlaneBytes(1), CNRT_MEM_TRANS_DIR_DEV2DEV);
+          CHECK_EQ(CNRT_RET_SUCCESS, ret) << "offset:" << offset << " output data:" << output_data
+            << " plane_uv:" << plane_uv << " plane bytes: " << data->frame.GetPlaneBytes(1);
+        } else {
+          // run resize and convert.
+          try {
+            d_ptr_->CheckAndUpdateRCOp(data);
+            pctx->rc_op.InvokeOp(output_data, plane_y, plane_uv);
+            ret = cnrtSyncStream(pctx->rc_op.cnrt_stream());
+            if (CNRT_RET_SUCCESS != ret) {
+              throw libstream::StreamlibsError("mlu preprocess failed. error code: " + std::to_string(ret));
+            }
+          } catch (libstream::StreamlibsError &e) {
+            PostEvent(EVENT_ERROR, e.what());
+            return -1;
+          }
         }
-      } catch (libstream::StreamlibsError e) {
-        PostEvent(EVENT_ERROR, e.what());
+        break;
+      }
+      default:
+        PostEvent(EVENT_ERROR, "Unsupported data format:" +std::to_string(fmt));
         return -1;
       }
     }
@@ -315,24 +339,22 @@ int Inferencer::ProcessBatch() {
     if (d_ptr_->post_proc_.get() != nullptr) {
       auto shapes = d_ptr_->model_loader_->output_shapes();
       for (size_t bi = 0; bi < bsize; ++bi) {
-        std::vector<std::pair<float*, uint64_t>> results;
+        std::vector<float*> results;
         for (size_t output_i = 0; output_i < shapes.size(); ++output_i) {
           uint64_t offset = shapes[output_i].DataCount();
-          auto pair = std::make_pair(reinterpret_cast<float*>(pctx->cpu_output[output_i]) + bi * offset, offset);
-          results.push_back(pair);
+          results.push_back(reinterpret_cast<float*>(pctx->cpu_output[output_i]) + bi * offset);
         }
-        d_ptr_->post_proc_->Execute(results, pctx->vec_data[bi]);
+        d_ptr_->post_proc_->Execute(results, d_ptr_->model_loader_, pctx->vec_data[bi]);
       }
     }
-  } catch (libstream::StreamlibsError e) {
+  } catch (libstream::StreamlibsError &e) {
     PostEvent(EVENT_ERROR, e.what());
     return -1;
   }
 
   /* transmit data */
   for (auto& data : pctx->vec_data) {
-    if (container_)
-      container_->ProvideData(this, data);
+    if (container_) container_->ProvideData(this, data);
   }
   return 1;
 }

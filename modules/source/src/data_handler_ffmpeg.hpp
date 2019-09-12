@@ -33,11 +33,9 @@ extern "C" {
 
 #include <string>
 #include <thread>
-#include "cndecode/cndecode.h"
-#include "cnstream_timer.hpp"
-#include "cnvformat/cnvformat.h"
 #include "data_handler.hpp"
 #include "data_source.hpp"
+#include "ffmpeg_decoder.hpp"
 
 namespace cnstream {
 
@@ -45,29 +43,15 @@ class DataHandlerFFmpeg : public DataHandler {
  public:
   explicit DataHandlerFFmpeg(DataSource* module, const std::string& stream_id, const std::string& filename,
                              int framerate, bool loop)
-      : DataHandler(module), stream_id_(stream_id), filename_(filename), frame_rate_(framerate), loop_(loop) {}
-  ~DataHandlerFFmpeg() {
-    Close();
-    PrintPerformanceInfomation();
-  }
-
-  bool Open() override;
-  void Close() override;
+      : DataHandler(module, stream_id, framerate, loop), filename_(filename) {}
+  ~DataHandlerFFmpeg() { Close(); }
 
  public:
   bool CheckTimeOut(uint64_t ul_current_time);
 
  private:
-  std::string stream_id_;
-  std::string filename_;
-  int frame_rate_;
-  bool loop_;
-  std::atomic<int> running_{0};
-  std::thread thread_;
-  void ExtractingLoop();
-
- private:
   // ffmpeg demuxer
+  std::string filename_;
   AVFormatContext* p_format_ctx_ = nullptr;
   AVBitStreamFilterContext* bitstream_filter_ctx_ = nullptr;
   AVDictionary* options_ = NULL;
@@ -79,36 +63,14 @@ class DataHandlerFFmpeg : public DataHandler {
   bool find_pts_ = true;  // set it to true by default!
 
  private:
-  // decoder handler
-  DevContext dev_ctx_;
-  uint32_t chn_idx_;
-  uint64_t frame_id_ = 0;
-  libstream::CnDecode* instance_ = nullptr;
-  std::atomic<int> eos_got_{0};
-  std::atomic<int> send_flow_eos_{0};
+  bool PrepareResources() override;
+  void ClearResources() override;
+  bool Process() override;
+  bool Extract();
+  size_t process_state_ = 0;
 
-  bool SendPacket(const libstream::CnPacket& packet, bool eos);
-  bool PrepareResources();
-  void ClearResources();
-  bool Extract(libstream::CnPacket* pdata);
-  void ReleaseData(libstream::CnPacket* pdata);
-
-  CNTimer fps_calculators[4];
-  void PrintPerformanceInfomation() const {
-    printf("stream_id: %s:\n", stream_id_.c_str());
-    fps_calculators[0].PrintFps("transfer memory: ");
-    fps_calculators[1].PrintFps("decode delay: ");
-    fps_calculators[2].PrintFps("send data to codec: ");
-    fps_calculators[3].PrintFps("output :");
-  }
-  void PerfCallback(const libstream::CnDecodePerfInfo& info) {
-    fps_calculators[0].Dot(1.0f * info.transfer_us / 1000, 1);
-    fps_calculators[1].Dot(1.0f * info.decode_us / 1000, 1);
-    fps_calculators[2].Dot(1.0f * info.total_us / 1000, 1);
-    fps_calculators[3].Dot(1);
-  }
-  void FrameCallback(const libstream::CnFrame& frame);
-  void EOSCallback();
+ private:
+  std::shared_ptr<FFmpegDecoder> decoder_ = nullptr;
 };
 
 }  // namespace cnstream

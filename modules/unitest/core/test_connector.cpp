@@ -57,4 +57,13 @@ TEST(CoreConnector, PushPopDataBuffer) {
   EXPECT_EQ(data.get(), out_data.get());
 }
 
+TEST(CoreConnector, StartStop) {
+  size_t conveyor_count = 10;
+  Connector connector(conveyor_count);
+  connector.Start();
+  EXPECT_FALSE(connector.IsStopped());
+  connector.Stop();
+  EXPECT_TRUE(connector.IsStopped());
+}
+
 }  // namespace cnstream
