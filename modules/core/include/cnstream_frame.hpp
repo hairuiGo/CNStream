@@ -1,32 +1,31 @@
-////////////////////////////////////////////////////////////////////////////////
-/// Copyright (C) [2019] by Cambricon, Inc. All rights reserved
-///
-///  Licensed under the Apache License, Version 2.0 (the "License");
-///  you may not use this file except in compliance with the License.
-///  You may obtain a copy of the License at
-///
-///     http://www.apache.org/licenses/LICENSE-2.0
-///
-/// The above copyright notice and this permission notice shall be included in
-/// all copies or substantial portions of the Software.
-/// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-/// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-/// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-/// THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-/// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-/// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-/// THE SOFTWARE.
-///
-/// \file cnstream_frame.hpp
-/// \brief Head file for struct CNFrameInfo
-///
-/// This file contains a declaration of struct CNFrameInfo and its subtructure.
-///
-/// \authon Cambricon-CNStream
-////////////////////////////////////////////////////////////////////////////////
+/*************************************************************************
+ * Copyright (C) [2019] by Cambricon, Inc. All rights reserved
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+ * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ *************************************************************************/
 
 #ifndef CNSTREAM_FRAME_HPP_
 #define CNSTREAM_FRAME_HPP_
+
+/**
+ *  \file cnstream_frame.hpp
+ *
+ *  This file contains a declaration of struct CNFrameInfo and its subtructure.
+ */
 
 #include <map>
 #include <memory>
@@ -43,45 +42,51 @@
 #define CN_MAX_PLANES 6
 #endif
 
-/// \brief The namespace of CNStream
 namespace cnstream {
 
-/// \brief Data format name
-///
-/// Data format name of CNDataFrame, it is usually used to
-/// identify the pixel format for the dat ain CNDataFrame.
+/**
+ * Data format name of CNDataFrame, it is usually used to
+ * identify the pixel format for the dat ain CNDataFrame.
+ */
 typedef enum {
-  CN_INVALID = -1,  ///< Invalid frame
+  CN_INVALID = -1,                  ///< Invalid frame
   CN_PIXEL_FORMAT_YUV420_NV21 = 0,  ///< Identify that this frame is in YUV420SP(NV21) format
-  CN_PIXEL_FORMAT_YUV420_NV12,  ///< Identify that this frame is in YUV420sp(NV12) format
-  CN_PIXEL_FORMAT_BGR24,  ///< Identify that this frame is in BGR24 format
-  CN_PIXEL_FORMAT_RGB24  ///< Identify that this frame is in RGB24 format
+  CN_PIXEL_FORMAT_YUV420_NV12,      ///< Identify that this frame is in YUV420sp(NV12) format
+  CN_PIXEL_FORMAT_BGR24,            ///< Identify that this frame is in BGR24 format
+  CN_PIXEL_FORMAT_RGB24             ///< Identify that this frame is in RGB24 format
 } CNDataFormat;
 
-/// \brief Device context
-///
-/// It identifies which device(CPU/MLU) the data of CNDataFrame
-/// is alloc on.  
+/**
+ * It identifies which device(CPU/MLU) the data of CNDataFrame
+ * will be allocated on.
+ */
 typedef struct {
   enum DevType {
     INVALID = -1,  ///> Invalid device type
-    CPU = 0,
-    MLU = 1
+    CPU = 0,       ///> CPU
+    MLU = 1        ///> MLU
   } dev_type = INVALID;
-  int dev_id = 0;
-  /// The ddr channel on MLU
-  int ddr_channel = 0;
+  int dev_id = 0;       ///> Ordinal device id.
+  int ddr_channel = 0;  ///> Ordinal channel id for MLU. [0, 4).
 } DevContext;
 
-/// \brief Frame flag
-///
-/// The mask of CNDataFrame.
-///
-/// \see CNDataFrame::flags
+/**
+ * The mask of CNDataFrame
+ */
 enum CNFrameFlag {
-  CN_FRAME_FLAG_EOS = 1 << 0  /// This frame is the end of stream
+  CN_FRAME_FLAG_EOS = 1 << 0  ///> Identifies the end of data stream.
 };
 
+/**
+ * Get image plane number by image type.
+ *
+ * @param
+ *   fmt Image format.
+ *
+ * @return
+ * @retval 0: Unsupported picture format.
+ * @retval >0: Image plane number.
+ */
 inline int CNGetPlanes(CNDataFormat fmt) {
   switch (fmt) {
     case CN_PIXEL_FORMAT_BGR24:
@@ -96,172 +101,247 @@ inline int CNGetPlanes(CNDataFormat fmt) {
   return 0;
 }
 
-/// \brief dedicated deallocator for CNDecoder Buffer.
+/**
+ * Dedicated deallocator for CNDecoder Buffer.
+ */
 class IDataDeallocator {
  public:
-  virtual ~IDataDeallocator(){ }
- };
+  virtual ~IDataDeallocator() {}
+};
 
 class Module;
-/// \brief Frame data structure
-///
-/// The structure contains a frame of data and describes infomation
-/// about this frame.
+/**
+ * The structure contains a frame of data and describes infomation
+ * about this frame.
+ */
 struct CNDataFrame {
-  std::string stream_id;  ///> the data stream alias where this frame is located
-  size_t flags = 0;  ///> the mask for this frame, CNFrameFlag
-  int64_t frame_id;  ///> frame index, incremented from 0
-  int64_t timestamp;  ///> the timestamp of this frame
+  std::string stream_id;  ///> The data stream alias where this frame is located.
+  size_t flags = 0;       ///> The mask for this frame, CNFrameFlag.
+  int64_t frame_id;       ///> Frame index, incremented from 0.
+  int64_t timestamp;      ///> The timestamp of this frame.
 
-  /*source data info, should be filled before CopyToSyncMem() called
-  */
-  CNDataFormat fmt;  ///> frame format
-  int width;  ///> frame width
-  int height;  ///> frame height
-  int stride[CN_MAX_PLANES];  ///> frame strides
-  DevContext ctx;   ///> device context for this frame
-  void *ptr[CN_MAX_PLANES];  ///> cpu/mlu data addresses for planes
-  std::shared_ptr<IDataDeallocator> deAllocator_ = nullptr; ///> dedicated deallocator for CNDecoder Buffer.
+  /**
+   * Source data info, should be filled before CopyToSyncMem() called.
+   */
+  CNDataFormat fmt;                                          ///> Frame format.
+  int width;                                                 ///> Frame width.
+  int height;                                                ///> Frame height.
+  int stride[CN_MAX_PLANES];                                 ///> Frame strides.
+  DevContext ctx;                                            ///> Device context for this frame.
+  void* ptr[CN_MAX_PLANES];                                  ///> CPU/MLU data addresses for planes.
+  std::shared_ptr<IDataDeallocator> deAllocator_ = nullptr;  ///> Dedicated deallocator for CNDecoder Buffer.
 
   CNDataFrame(){};
 
   ~CNDataFrame();
 
-  /// \brief Get plane count for this frame.
-  /// \return Return plane count for this frame.
+  /**
+   * Get plane count for this frame.
+   *
+   * @return Return plane count for this frame.
+   */
   int GetPlanes() const { return CNGetPlanes(fmt); }
 
-  /// \brief Get number of bytes of the specified plane.
-  /// \param plane_idx The index of plane. Plane index incremented from 0.
-  /// \return Return number of bytes of the plane specified by plane_idx.
+  /**
+   * Get number of bytes of the specified plane.
+   *
+   * @param plane_idx The index of plane. Plane index incremented from 0.
+   *
+   * @return Return number of bytes of the plane specified by plane_idx.
+   */
   size_t GetPlaneBytes(int plane_idx) const;
 
-  /// \brief Get number of bytes of this frame.
-  /// \return Return number of bytes of this frame.
+  /**
+   * Get number of bytes of this frame.
+   *
+   * @return Return number of bytes of this frame.
+   */
   size_t GetBytes() const;
 
-  /// \brief sync source-data to CNSyncedMemory
+  /**
+   * Sync source-data to CNSyncedMemory
+   */
   void CopyToSyncMem();
 
-  /*the pipeline stages (modules) info
+  /**
+   * The pipeline stages (modules) info.
+   * Do not call it.
    */
   void SetModuleMask(Module* module, Module* current);
+  /**
+   * The pipeline stages (modules) info.
+   * Do not call it.
+   */
   unsigned long GetModulesMask(Module* module);
+  /**
+   * The pipeline stages (modules) info.
+   * Do not call it.
+   */
   void ClearModuleMask(Module* module);
 
-  /* the pipeline stages info */
-  /*
-    @brief add EOS mask. threadsafe function.
-    @param
-      module[in]: the mask is from this module.
-    @return
-      return mask after add mask.
+  /**
+   * The pipeline stages (modules) info.
+   * Do not call it.
+   *
+   * Add EOS mask. threadsafe function.
+   *
+   * @param
+   *   module[in]: The mask is from this module.
+   *
+   * @return
+   *   Return mask after add mask.
    */
   unsigned long AddEOSMask(Module* module);
 
  public:
-  void* cpu_data = nullptr; /*should be allocated by CNStreamMallocHost()*/
-  void* mlu_data = nullptr;
-  std::shared_ptr<CNSyncedMemory> data[CN_MAX_PLANES];
+  void* cpu_data = nullptr;  ///> CPU data pointer. Should be allocated by CNStreamMallocHost().
+  void* mlu_data = nullptr;  ///> MLU data pointer.
+  std::shared_ptr<CNSyncedMemory> data[CN_MAX_PLANES];  ///> Synce data helper.
 
 #ifdef HAVE_OPENCV
   /*called after CopyToSyncMem() invoked*/
-  cv::Mat *ImageBGR();
+  cv::Mat* ImageBGR();
+
  private:
-  cv::Mat *bgr_mat = nullptr;
+  cv::Mat* bgr_mat = nullptr;
 #endif
  private:
   std::mutex modules_mutex;
+  /*Module mask map, identify which modules the data can already be processed by.*/
   std::map<unsigned int, unsigned long> module_mask_map_;
 
   std::mutex eos_mutex;
   unsigned long eos_mask = 0;
 };  // struct CNDataFrame
 
-/// \brief Bounding box for detection information for one object.
-///
-/// Normalized coordinates.
+/**
+ * Bounding box for detection information for one object.
+ * Normalized coordinates.
+ */
 typedef struct {
   float x, y, w, h;
 } CNInferBoundingBox;
 
-/// \brief Classification Properties for one object.
+/**
+ * Classification Properties for one object.
+ */
 typedef struct {
-  int id = -1;  ///> Classification unique id. -1 is invalid.
-  int value = -1;  ///> Classification value(label value).
-  float score = 0;
+  int id = -1;      ///> Classification unique id. -1 is invalid.
+  int value = -1;   ///> Classification value(label value).
+  float score = 0;  ///> Label score.
 } CNInferAttr;
 
-/// \brief Feature value for one object.
+/**
+ * Feature value for one object.
+ */
 typedef std::vector<float> CNInferFeature;
 
-/// \brief Object structured information.
-///
-/// Structured information for one object.
+/**
+ * Object structured information.
+ * Structured information for one object.
+ */
 typedef struct {
  public:
-  std::string id;  ///> Classification id(label value).
-  std::string track_id;  ///> Track result.
-  float score;
+  std::string id;           ///> Classification id(label value).
+  std::string track_id;     ///> Track result.
+  float score;              ///> Label score.
   CNInferBoundingBox bbox;  ///> Object normalized coordinates.
 
-  /// \brief Add attribute for this object.
-  /// \param key Key of attribute, you can get this attribute by key. see GetAttribute.
-  /// \param value Attribute value.
-  /// \return Returns true for attribute successfully added. Returns false when an attribute
-  ///  identified by the key already exists.
-  /// \note This is a thread-safe function.
+  /**
+   * Add attribute for this object.
+   *
+   * @param key Key of attribute, you can get this attribute by key. see GetAttribute.
+   * @param value Attribute value.
+   *
+   * @return Returns true for attribute successfully added. Returns false when an attribute
+   *         identified by the key already exists.
+   *
+   * @note This is a thread-safe function.
+   */
   bool AddAttribute(const std::string& key, const CNInferAttr& value);
 
-  /// \brief Add attribute for this object.
-  /// \param attribute Attribute pair (key, value) to be added.
-  /// \return Returns true for attribute successfully added. Returns false when an attribute
-  ///  identified by the key already exists.
-  /// \note This is a thread-safe function.
+  /**
+   * Add attribute for this object.
+   *
+   * @param attribute Attribute pair (key, value) to be added.
+   *
+   * @return Returns true for attribute successfully added. Returns false when an attribute
+   *         identified by the key already exists.
+   *
+   * @note This is a thread-safe function.
+   */
   bool AddAttribute(const std::pair<std::string, CNInferAttr>& attribute);
 
-  /// \brief Get attribute by key.
-  /// \param key Key for identify attribute. See AddAttribute
-  /// \return Return attribute identified by the key. If the attribute identified by the key
-  ///  is not exists, CNInferAttr::id will be set to -1.
-  /// \note This is a thread-safe function.
+  /**
+   * Get attribute by key.
+   *
+   * @param key Key for identify attribute. See AddAttribute
+   *
+   * @return Return attribute identified by the key. If the attribute identified by the key
+   *         is not exists, CNInferAttr::id will be set to -1.
+   *
+   * @note This is a thread-safe function.
+   */
   CNInferAttr GetAttribute(const std::string& key);
 
-  /// \brief Add extended attribute for this object.
-  /// \param key Key of attribute, you can get this attribute by key. see GetExtraAttribute.
-  /// \param value Attribute value.
-  /// \return Returns true for attribute successfully added. Returns false when an attribute
-  ///  identified by the key already exists.
-  /// \note This is a thread-safe function.
+  /**
+   * Add extended attribute for this object.
+   *
+   * @param key Key of attribute, you can get this attribute by key. see GetExtraAttribute.
+   * @param value Attribute value.
+   *
+   * @return Returns true for attribute successfully added. Returns false when an attribute
+   *         identified by the key already exists.
+   *
+   * @note This is a thread-safe function.
+   */
   bool AddExtraAttribute(const std::string& key, const std::string& value);
 
-  /// \brief Add extended attributes for this object.
-  /// \param attributes Attributes to be add.
-  /// \return Returns true for attribute successfully added. Returns false when an attribute
-  ///  identified by the key already exists.
-  /// \note This is a thread-safe function.
+  /**
+   * Add extended attributes for this object.
+   *
+   * @param attributes Attributes to be add.
+   *
+   * @return Returns true for attribute successfully added. Returns false when an attribute
+   *         identified by the key already exists.
+   *
+   * @note This is a thread-safe function.
+   */
   bool AddExtraAttribute(const std::vector<std::pair<std::string, std::string>>& attributes);
 
-  /// \brief Get extended attribute by key.
-  /// \param key Key for identify attribute. See AddExtraAttribute
-  /// \return Return attribute identified by the key. If the attribute identified by the key
-  ///  is not exists, NULL will be returned.
-  /// \note This is a thread-safe function.
+  /**
+   * Get extended attribute by key.
+   *
+   * @param key Key for identify attribute. See AddExtraAttribute
+   *
+   * @return Return attribute identified by the key. If the attribute identified by the key
+   *         is not exists, NULL will be returned.
+   *
+   * @note This is a thread-safe function.
+   */
   std::string GetExtraAttribute(const std::string& key);
 
-  /// \brief Add feature value for this object.
-  /// \param features Feature value.
-  /// \return void.
-  /// \note This is a thread-safe function.
+  /**
+   * Add feature value for this object.
+   *
+   * @param features Feature value.
+   *
+   * @return void.
+   *
+   * @note This is a thread-safe function.
+   */
   void AddFeature(const CNInferFeature& features);
 
-  /// \brief Get features for this object.
-  /// \return Return features for this object.
-  /// \note This is a thread-safe function.
+  /**
+   * Get features for this object.
+   *
+   * @return Return features for this object.
+   *
+   * @note This is a thread-safe function.
+   */
   std::vector<CNInferFeature> GetFeatures();
 
-  /// \brief User data. User can store their own data here.
-  void* user_data_ = nullptr;
+  void* user_data_ = nullptr;  ///> User data. User can store their own data here.
 
  private:
   // name >>> attribute
@@ -272,18 +352,24 @@ typedef struct {
   std::mutex feature_mutex_;
 } CNInferObject;
 
-/// \brief Structured information of one frame.
+/**
+ * Structured information of one frame.
+ */
 struct CNFrameInfo {
-  /// \brief Create an CNFrameInfo instance.
-  /// \param stream_id Data stream alias. Identify which data stream the frame data comes from.
-  /// \param eos If true, CNDataFrame::flags will set to CN_FRAME_FLAG_EOS. Then, the modules
-  ///  do not have permission to process this frame. This frame should be handed over to the pipeline
-  ///  for processing.
-  /// \return Return a shared_ptr of CNFrameInfo for success. Otherwise, NULL will be returned.
+  /**
+   * Create an CNFrameInfo instance.
+   *
+   * @param stream_id Data stream alias. Identify which data stream the frame data comes from.
+   * @param eos If true, CNDataFrame::flags will set to CN_FRAME_FLAG_EOS. Then, the modules
+   *            do not have permission to process this frame. This frame should be handed over to the pipeline
+   *            for processing.
+   *
+   * @return Return a shared_ptr of CNFrameInfo for success. Otherwise, NULL will be returned.
+   */
   static std::shared_ptr<CNFrameInfo> Create(const std::string& stream_id, bool eos = false);
-  uint32_t channel_idx; /*used by the framework*/
-  CNDataFrame frame;  ///> frame data
-  std::vector<std::shared_ptr<CNInferObject>> objs;  ///> Structured informations of objects for this frame. 
+  uint32_t channel_idx;                              ///> Channel index.
+  CNDataFrame frame;                                 ///> Frame data.
+  std::vector<std::shared_ptr<CNInferObject>> objs;  ///> Structured informations of objects for this frame.
   ~CNFrameInfo();
 
  private:
@@ -296,11 +382,11 @@ struct CNFrameInfo {
   static int parallelism_;
 };
 
-/// \brief Limit the resource for each stream.
-///
-/// limit the resource for each stream,
-/// there will be no more than "parallelism" frames simultanously.
-/// Disabled as default.
+/**
+ * Limit the resource for each stream,
+ * there will be no more than "parallelism" frames simultanously.
+ * Disabled as default.
+ */
 void SetParallelism(int parallelism);
 
 }  // namespace cnstream

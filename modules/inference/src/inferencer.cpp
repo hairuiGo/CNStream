@@ -263,48 +263,50 @@ int Inferencer::Process(CNFrameInfoPtr data) {
 
       const CNDataFormat fmt = data->frame.fmt;
       switch (fmt) {
-      case CNDataFormat::CN_PIXEL_FORMAT_YUV420_NV21:
-      case CNDataFormat::CN_PIXEL_FORMAT_YUV420_NV12: {
-        unsigned int offset = 0;
-        cnrtRet_t ret = cnrtGetMemcpyBatchAlignment(d_ptr_->model_loader_->input_desc_array()[0], &offset);
-        CHECK_EQ(CNRT_RET_SUCCESS, ret);
-        void* output_data =
-            reinterpret_cast<void*>(reinterpret_cast<uint64_t>(pctx->mlu_input[0]) + offset * batch_index);
-        void* plane_y = data->frame.data[0]->GetMutableMluData();
-        void* plane_uv = data->frame.data[1]->GetMutableMluData();
-        if (d_ptr_->model_loader_->WithYUVInput()) {
-          CHECK_EQ(d_ptr_->model_loader_->input_shapes()[0].w(), static_cast<uint32_t>(data->frame.width))
-            << "Your offline model can not deal with this frame, frame size mismatch.";
-          CHECK_EQ(d_ptr_->model_loader_->input_shapes()[0].h(), static_cast<uint32_t>(data->frame.height * 1.5))
-            << "Your offline model can not deal with this frame, frame size mismatch.";
-          // yuv, copy to batch memory
-          ret = cnrtMemcpy(output_data, plane_y, data->frame.GetPlaneBytes(0), CNRT_MEM_TRANS_DIR_DEV2DEV);
-          CHECK_EQ(CNRT_RET_SUCCESS, ret) << "offset:" << offset << " output data:" << output_data
-            << " plane_y:" << plane_y << " plane bytes: " << data->frame.GetPlaneBytes(0);
-          output_data =
-            reinterpret_cast<void*>(reinterpret_cast<uint64_t>(output_data) + data->frame.GetPlaneBytes(0));
-          ret = cnrtMemcpy(output_data, plane_uv, data->frame.GetPlaneBytes(1), CNRT_MEM_TRANS_DIR_DEV2DEV);
-          CHECK_EQ(CNRT_RET_SUCCESS, ret) << "offset:" << offset << " output data:" << output_data
-            << " plane_uv:" << plane_uv << " plane bytes: " << data->frame.GetPlaneBytes(1);
-        } else {
-          // run resize and convert.
-          try {
-            d_ptr_->CheckAndUpdateRCOp(data);
-            pctx->rc_op.InvokeOp(output_data, plane_y, plane_uv);
-            ret = cnrtSyncStream(pctx->rc_op.cnrt_stream());
-            if (CNRT_RET_SUCCESS != ret) {
-              throw libstream::StreamlibsError("mlu preprocess failed. error code: " + std::to_string(ret));
+        case CNDataFormat::CN_PIXEL_FORMAT_YUV420_NV21:
+        case CNDataFormat::CN_PIXEL_FORMAT_YUV420_NV12: {
+          unsigned int offset = 0;
+          cnrtRet_t ret = cnrtGetMemcpyBatchAlignment(d_ptr_->model_loader_->input_desc_array()[0], &offset);
+          CHECK_EQ(CNRT_RET_SUCCESS, ret);
+          void* output_data =
+              reinterpret_cast<void*>(reinterpret_cast<uint64_t>(pctx->mlu_input[0]) + offset * batch_index);
+          void* plane_y = data->frame.data[0]->GetMutableMluData();
+          void* plane_uv = data->frame.data[1]->GetMutableMluData();
+          if (d_ptr_->model_loader_->WithYUVInput()) {
+            CHECK_EQ(d_ptr_->model_loader_->input_shapes()[0].w(), static_cast<uint32_t>(data->frame.width))
+                << "Your offline model can not deal with this frame, frame size mismatch.";
+            CHECK_EQ(d_ptr_->model_loader_->input_shapes()[0].h(), static_cast<uint32_t>(data->frame.height * 1.5))
+                << "Your offline model can not deal with this frame, frame size mismatch.";
+            // yuv, copy to batch memory
+            ret = cnrtMemcpy(output_data, plane_y, data->frame.GetPlaneBytes(0), CNRT_MEM_TRANS_DIR_DEV2DEV);
+            CHECK_EQ(CNRT_RET_SUCCESS, ret)
+                << "offset:" << offset << " output data:" << output_data << " plane_y:" << plane_y
+                << " plane bytes: " << data->frame.GetPlaneBytes(0);
+            output_data =
+                reinterpret_cast<void*>(reinterpret_cast<uint64_t>(output_data) + data->frame.GetPlaneBytes(0));
+            ret = cnrtMemcpy(output_data, plane_uv, data->frame.GetPlaneBytes(1), CNRT_MEM_TRANS_DIR_DEV2DEV);
+            CHECK_EQ(CNRT_RET_SUCCESS, ret)
+                << "offset:" << offset << " output data:" << output_data << " plane_uv:" << plane_uv
+                << " plane bytes: " << data->frame.GetPlaneBytes(1);
+          } else {
+            // run resize and convert.
+            try {
+              d_ptr_->CheckAndUpdateRCOp(data);
+              pctx->rc_op.InvokeOp(output_data, plane_y, plane_uv);
+              ret = cnrtSyncStream(pctx->rc_op.cnrt_stream());
+              if (CNRT_RET_SUCCESS != ret) {
+                throw libstream::StreamlibsError("mlu preprocess failed. error code: " + std::to_string(ret));
+              }
+            } catch (libstream::StreamlibsError& e) {
+              PostEvent(EVENT_ERROR, e.what());
+              return -1;
             }
-          } catch (libstream::StreamlibsError &e) {
-            PostEvent(EVENT_ERROR, e.what());
-            return -1;
           }
+          break;
         }
-        break;
-      }
-      default:
-        PostEvent(EVENT_ERROR, "Unsupported data format:" +std::to_string(fmt));
-        return -1;
+        default:
+          PostEvent(EVENT_ERROR, "Unsupported data format:" + std::to_string(fmt));
+          return -1;
       }
     }
 
@@ -347,7 +349,7 @@ int Inferencer::ProcessBatch() {
         d_ptr_->post_proc_->Execute(results, d_ptr_->model_loader_, pctx->vec_data[bi]);
       }
     }
-  } catch (libstream::StreamlibsError &e) {
+  } catch (libstream::StreamlibsError& e) {
     PostEvent(EVENT_ERROR, e.what());
     return -1;
   }

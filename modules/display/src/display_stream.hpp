@@ -22,9 +22,9 @@
 #define DISPLAY_STREAM_HPP_
 
 #ifdef HAVE_OPENCV
- #include <opencv2/opencv.hpp>
+#include <opencv2/opencv.hpp>
 #else
- #error OpenCV required
+#error OpenCV required
 #endif
 #include <chrono>
 #include <thread>

@@ -31,7 +31,7 @@
 
 namespace cnstream {
 
-/// Pointer for frame info 
+/// Pointer for frame info
 using CNFrameInfoPtr = std::shared_ptr<cnstream::CNFrameInfo>;
 
 class DisplayStream;
@@ -41,8 +41,7 @@ class DisplayStream;
  */
 class Displayer : public Module, public ModuleCreator<Displayer> {
  public:
- 
- /** 
+  /**
    *  @brief  Generate Displayer
    *
    *  @param  Name : module name
@@ -50,8 +49,8 @@ class Displayer : public Module, public ModuleCreator<Displayer> {
    *  @return None
    */
   explicit Displayer(const std::string& name);
-  
- /** 
+
+  /**
    *  @brief  Release Displayer
    *
    *  @param  None
@@ -77,13 +76,13 @@ class Displayer : public Module, public ModuleCreator<Displayer> {
   bool Open(ModuleParamSet paramSet) override;
 
   /**
-	* @brief  Called by pipeline when pipeline stop
-	*
-	* @param  None
-	*
-	* @return  None
-	*/
-	
+   * @brief  Called by pipeline when pipeline stop
+   *
+   * @param  None
+   *
+   * @return  None
+   */
+
   void Close() override;
 
   /**

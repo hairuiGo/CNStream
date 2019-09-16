@@ -31,37 +31,68 @@
 #include "cnstream_frame.hpp"
 
 namespace cnstream {
-
+/**
+ * @brief construct a pointer to CNFrameInfo
+ */
 using CNFrameInfoPtr = std::shared_ptr<CNFrameInfo>;
-
+/**
+ * @brief Base class of post process
+ */
 class Postproc {
  public:
+  /**
+   * @brief do nothong
+   */
   virtual ~Postproc() {}
+  /**
+   * @brief create relative postprocess
+   *
+   * @param proc_name postprocess class name
+   *
+   * @return None
+   */
   static Postproc* Create(const std::string& proc_name);
-
+  /**
+   * @brief set threshold
+   *
+   * @param threshold the value between 0 and 1
+   *
+   * @return void
+   */
   void set_threshold(const float threshold);
 
-  /******************************************************************************
+  /**
    * @brief Execute postproc on neural network outputs
-   * @param
-   *   net_outputs: neural network outputs
-   *   model: model information(you can get input shape and output shape from model)
-   *   package: smart pointer of struct to store processed result
+   *
+   * @param net_outputs: neural network outputs
+   * @param model: model information(you can get input shape and output shape from model)
+   * @param package: smart pointer of struct to store processed result
+   *
    * @return return 0 if succeed
-   ******************************************************************************/
-  virtual int Execute(const std::vector<float*>& net_outputs,
-      const std::shared_ptr<libstream::ModelLoader>& model,
-      const CNFrameInfoPtr& package) = 0;
+   */
+  virtual int Execute(const std::vector<float*>& net_outputs, const std::shared_ptr<libstream::ModelLoader>& model,
+                      const CNFrameInfoPtr& package) = 0;
 
  protected:
   float threshold_ = 0;
 };  // class Postproc
 
+/**
+ * @brief Ssd of post process
+ */
 class PostprocSsd : public Postproc, virtual public libstream::ReflexObjectEx<Postproc> {
  public:
-  int Execute(const std::vector<float*>& net_outputs,
-      const std::shared_ptr<libstream::ModelLoader>& model,
-      const CNFrameInfoPtr& package) override;
+  /**
+   * @brief Execute postproc on neural ssd network outputs
+   *
+   * @param net_outputs: neural network outputs
+   * @param model: model information(you can get input shape and output shape from model)
+   * @param package: smart pointer of struct to store processed result
+   *
+   * @return return 0 if succeed
+   */
+  int Execute(const std::vector<float*>& net_outputs, const std::shared_ptr<libstream::ModelLoader>& model,
+              const CNFrameInfoPtr& package) override;
 
   DECLARE_REFLEX_OBJECT_EX(PostprocSsd, Postproc)
 };  // class PostprocSsd

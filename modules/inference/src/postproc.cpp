@@ -47,9 +47,8 @@ void Postproc::set_threshold(const float threshold) { threshold_ = threshold; }
 
 IMPLEMENT_REFLEX_OBJECT_EX(PostprocSsd, Postproc)
 
-int PostprocSsd::Execute(const std::vector<float*>& net_outputs,
-      const std::shared_ptr<libstream::ModelLoader>& model,
-      const CNFrameInfoPtr& package) {
+int PostprocSsd::Execute(const std::vector<float*>& net_outputs, const std::shared_ptr<libstream::ModelLoader>& model,
+                         const CNFrameInfoPtr& package) {
   if (net_outputs.size() != 1) {
     cerr << "[Warnning] Ssd neuron network only has one output,"
             " but get " +

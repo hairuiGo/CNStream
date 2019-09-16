@@ -32,7 +32,7 @@
 
 namespace cnstream {
 
-/// Pointer for frame info 
+/// Pointer for frame info
 using CNFrameInfoPtr = std::shared_ptr<cnstream::CNFrameInfo>;
 
 /**
@@ -42,16 +42,14 @@ struct TrackerContext {
   libstream::CnTrack *processer_ = nullptr;
 };
 
-
-/** 
+/**
  *  @brief Tracker is a module for realtime tracking
  *   It would be MLU feature extracting if the model_path provided,
  *   otherwise it would be done on CPU.
- */ 
+ */
 class Tracker : public Module, public ModuleCreator<Tracker> {
  public:
-
-  /** 
+  /**
    *  @brief  Generate tracker
    *
    *  @param  Name : Module name
@@ -59,7 +57,7 @@ class Tracker : public Module, public ModuleCreator<Tracker> {
    *  @return None
    */
   explicit Tracker(const std::string &name);
-  /** 
+  /**
    *  @brief  Release tracker
    *
    *  @param  None
@@ -67,10 +65,10 @@ class Tracker : public Module, public ModuleCreator<Tracker> {
    *  @return None
    */
   ~Tracker();
-  /** 
+  /**
    *  @brief Called by pipeline when pipeline start
    *
-   *  @param paramSet : 
+   *  @param paramSet :
    @verbatim
    model_path: Offline model path
    func_name:  Function name defined in the offline model, could be found in the cambricon_twins description file
@@ -92,7 +90,7 @@ class Tracker : public Module, public ModuleCreator<Tracker> {
   /**
    * @brief Do for each frame
    *
-   * @param data : Pointer to the frame info 
+   * @param data : Pointer to the frame info
    *
    * @return whether process succeed
    * @retval 0: succeed and do no intercept data
@@ -101,7 +99,6 @@ class Tracker : public Module, public ModuleCreator<Tracker> {
   int Process(std::shared_ptr<CNFrameInfo> data) override;
 
  private:
- 
   TrackerContext *GetTrackerContext(CNFrameInfoPtr data);
   std::unordered_map<int, TrackerContext *> tracker_ctxs_;
   std::shared_ptr<libstream::ModelLoader> ploader_;

@@ -35,8 +35,7 @@ namespace cnstream {
  */
 class Osd : public Module, public ModuleCreator<Osd> {
  public:
- 
-  /** 
+  /**
    *  @brief  Generate osd
    *
    *  @param  Name : Module name
@@ -52,7 +51,7 @@ class Osd : public Module, public ModuleCreator<Osd> {
    @verbatim
    label_path: label path
    @endverbatim
-   *  
+   *
    * @return if module open succeed
    */
   bool Open(cnstream::ModuleParamSet paramSet) override;
@@ -69,7 +68,7 @@ class Osd : public Module, public ModuleCreator<Osd> {
   /**
    * @brief Do for each frame
    *
-   * @param data : Pointer to the frame info 
+   * @param data : Pointer to the frame info
    *
    * @return whether process succeed
    * @retval 0: succeed and do no intercept data

@@ -21,9 +21,9 @@
 #include <algorithm>
 #include <atomic>
 #include <functional>
-#include "glog/logging.h"
 #include "data_handler_ffmpeg.hpp"
 #include "data_handler_raw.hpp"
+#include "glog/logging.h"
 
 namespace cnstream {
 
@@ -106,12 +106,20 @@ bool DataSource::Open(ModuleParamSet paramSet) {
     }
   }
 
-  if(param_.source_type_ == SOURCE_RAW) {
-    if(paramSet.find("chunk_size") == paramSet.end()
-      ||paramSet.find("width") == paramSet.end()
-      ||paramSet.find("height") == paramSet.end()
-      ||paramSet.find("interlaced") == paramSet.end()
-      ){
+  if (param_.decoder_type_ == DECODER_MLU) {
+    param_.reuse_cndec_buf = false;
+    if (paramSet.find("reuse_cndec_buf") != paramSet.end()) {
+      if (paramSet["reuse_cndec_buf"] == "true") {
+        param_.reuse_cndec_buf = true;
+      } else {
+        param_.reuse_cndec_buf = false;
+      }
+    }
+  }
+
+  if (param_.source_type_ == SOURCE_RAW) {
+    if (paramSet.find("chunk_size") == paramSet.end() || paramSet.find("width") == paramSet.end() ||
+        paramSet.find("height") == paramSet.end() || paramSet.find("interlaced") == paramSet.end()) {
       return false;
     }
     {
@@ -140,9 +148,7 @@ bool DataSource::Open(ModuleParamSet paramSet) {
   return true;
 }
 
-void DataSource::Close() {
-  RemoveSources();
-}
+void DataSource::Close() { RemoveSources(); }
 
 int DataSource::Process(std::shared_ptr<CNFrameInfo> data) {
   (void)data;
@@ -224,7 +230,7 @@ int DataSource::RemoveSource(const std::string &stream_id) {
 int DataSource::RemoveSources() {
   std::unique_lock<std::mutex> lock(mutex_);
   std::map<std::string, std::shared_ptr<DataHandler>>::iterator iter;
-  for(iter = source_map_.begin(); iter != source_map_.end(); ) {
+  for (iter = source_map_.begin(); iter != source_map_.end();) {
     iter->second->Close();
     source_map_.erase(iter++);
   }

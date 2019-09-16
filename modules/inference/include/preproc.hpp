@@ -25,39 +25,66 @@
 #include <utility>
 #include <vector>
 
-#include "cninfer/model_loader.h"
 #include "cnbase/reflex_object.h"
+#include "cninfer/model_loader.h"
 
 #include "cnstream_frame.hpp"
 
 namespace cnstream {
 
+/**
+ * @brief construct a pointer to CNFrameInfo
+ */
 using CNFrameInfoPtr = std::shared_ptr<CNFrameInfo>;
-
+/**
+ * @brief Base class of pre process
+ */
 class Preproc {
  public:
+  /**
+   * @brief do nothong
+   */
   virtual ~Preproc() {}
+  /**
+   * @brief create relative preprocess
+   *
+   * @param pre_name preprocess class name
+   *
+   * @return None
+   */
   static Preproc* Create(const std::string& proc_name);
 
-  /******************************************************************************
-   * @brief Execute preproc on neural network inputs
-   * @param
-   *   net_inputs: neural network input data
-   *   model: model information(you can get input shape and output shape from model)
-   *   package: smart pointer of struct stored network input image
-   * @return return true if succeed
-   ******************************************************************************/
+  /**
+   * @brief Execute preproc on neural network outputs
+   *
+   * @param net_inputs: neural network inputs
+   * @param model: model information(you can get input shape and output shape from model)
+   * @param package: smart pointer of struct to store origin data
+   *
+   * @return return 0 if succeed
+   */
   virtual int Execute(const std::vector<float*>& net_inputs, const std::shared_ptr<libstream::ModelLoader>& model,
-    const CNFrameInfoPtr& package) = 0;
+                      const CNFrameInfoPtr& package) = 0;
 };  // class Preproc
 
+/**
+ * @brief standard pre process
+ */
 class PreprocCpu : public Preproc, virtual public libstream::ReflexObjectEx<Preproc> {
  public:
-  /******************************************************************************
+  /**
+   * @brief Execute preproc on origin data
+   *
+   * @param net_inputs: neural network inputs
+   * @param model: model information(you can get input shape and output shape from model)
+   * @param package: smart pointer of struct to store origin data
+   *
+   * @return return 0 if succeed
+   *
    * @attention net_inputs is a pointer to pre-allocated cpu memory
-   ******************************************************************************/
+   */
   int Execute(const std::vector<float*>& net_inputs, const std::shared_ptr<libstream::ModelLoader>& model,
-    const CNFrameInfoPtr& package) override;
+              const CNFrameInfoPtr& package) override;
 
   DECLARE_REFLEX_OBJECT_EX(PreprocCpu, Preproc);
 };  // class PreprocCpu

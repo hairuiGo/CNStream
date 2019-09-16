@@ -79,7 +79,7 @@ int Tracker::Process(std::shared_ptr<CNFrameInfo> data) {
 #ifdef HAVE_OPENCV
   ctx->processer_->UpdateCpuFrame(*data->frame.ImageBGR(), in, &out);
 #else
-  #error OpenCV required
+#error OpenCV required
 #endif
   data->objs.clear();
   for (size_t i = 0; i < out.size(); i++) {

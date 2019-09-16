@@ -21,42 +21,50 @@
 #ifndef CNSTREAM_TIMER_HPP_
 #define CNSTREAM_TIMER_HPP_
 
+/**
+ * @file cnstream_timer.hpp
+ *
+ * This file contains a declaration of class CNTimer.
+ */
+
 #include <chrono>
 #include <string>
 
 namespace cnstream {
 
 /***********************************************************
- * @brief Calculate the average time in ms for each frame.
- *        Calculate fps, as well.
+ * Calculate the average time in ms for each frame.
+ * Calculate fps, as well.
  ***********************************************************/
 class CNTimer {
  public:
   void Dot(uint32_t cnt_step);
   /**************************************************************
-   * @brief record one step time info
-   * @param
-   *   time[in]: the cost time in ms of a cnt_step.
-   *   cnt_step[in]: process step. As once processing batch frames,
-   *               in most case, cnt_step is equal to batch size.
+   * Record one step time info
+   *
+   * @param time The cost time in ms of a cnt_step.
+   * @param cnt_step Process step. As once processing batch frames,
+   *        in most case, cnt_step is equal to batch size.
    **************************************************************/
   void Dot(double time, uint32_t cnt_step);
   /**************************************************************
-   * @brief calculate and print fps
-   * @param
-   *   head[in]: print head string before fps information
+   * Calculate and print fps
+   *
+   * @param head Print head string before fps information.
    **************************************************************/
-  void PrintFps(const std::string &head) const;
+  void PrintFps(const std::string& head) const;
   /**************************************************************
-   * @brief clear all record
+   * Clear all record.
    **************************************************************/
   void Clear();
   /**************************************************************
-   * @brief mix other record into this timer
+   * Mix other record into this timer.
    **************************************************************/
   void MixUp(const CNTimer& other);
   /**************************************************************
-   * @brief get average cost time one step
+   * Get average cost time one step.
+   *
+   * @return Return average cost time.
    **************************************************************/
   double GetAvg() const;
 

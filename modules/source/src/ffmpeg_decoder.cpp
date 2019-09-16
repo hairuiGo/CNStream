@@ -87,6 +87,9 @@ bool FFmpegMluDecoder::Create(AVStream *st) {
   instance_attr.output_geometry.h = codec_height;
   instance_attr.drop_rate = 0;
   instance_attr.frame_buffer_num = 3;
+  if (handler_.ReuseCNDecBuf()) {
+    instance_attr.frame_buffer_num += 6;  // FIXME
+  }
   instance_attr.dev_id = dev_ctx_.dev_id;
   instance_attr.video_mode = libstream::FRAME_MODE;
   instance_attr.silent = false;
@@ -99,11 +102,13 @@ bool FFmpegMluDecoder::Create(AVStream *st) {
   // create CnDecode
   try {
     std::unique_lock<std::mutex> lock(decoder_mutex);
-    if (instance_ != nullptr) {
-      delete instance_, instance_ = nullptr;
-    }
+    instance_.reset();
     eos_got_.store(0);
-    instance_ = libstream::CnDecode::Create(instance_attr);
+    instance_.reset(libstream::CnDecode::Create(instance_attr));
+    if (nullptr == instance_.get()) {
+      LOG(ERROR) << "[Decoder] failed to create";
+      return false;
+    }
   } catch (libstream::StreamlibsError &e) {
     LOG(ERROR) << "[Decoder] " << e.what();
     return false;
@@ -113,14 +118,16 @@ bool FFmpegMluDecoder::Create(AVStream *st) {
 
 void FFmpegMluDecoder::Destroy() {
   if (instance_ != nullptr) {
+    if (eos_got_.load() > 1) {
+      return;
+    }
     if (!handler_.GetDemuxEos()) {
       this->Process(nullptr, true);
     }
     while (!eos_got_.load()) {
       usleep(1000 * 10);
     }
-    eos_got_.store(0);
-    delete instance_, instance_ = nullptr;
+    eos_got_.store(2);  // avoid double-wait eos
   }
 }
 
@@ -146,12 +153,13 @@ bool FFmpegMluDecoder::Process(AVPacket *pkt, bool eos) {
   return false;
 }
 
-int FFmpegMluDecoder::ProcessFrame(const libstream::CnFrame &frame) {
+int FFmpegMluDecoder::ProcessFrame(const libstream::CnFrame &frame, bool &reused) {
+  reused = false;
   auto data = CNFrameInfo::Create(stream_id_);
   if (data == nullptr) {
-    //LOG(WARNING) << "CNFrameInfo::Create Failed,DISCARD image";
+    // LOG(WARNING) << "CNFrameInfo::Create Failed,DISCARD image";
     ++discard_frame_num_;
-    if(discard_frame_num_ % 20 == 0){
+    if (discard_frame_num_ % 20 == 0) {
       LOG(WARNING) << "CNFrameInfo::Create Failed,DISCARD image: " << discard_frame_num_;
     }
     return -1;
@@ -164,21 +172,29 @@ int FFmpegMluDecoder::ProcessFrame(const libstream::CnFrame &frame) {
   data->frame.width = frame.width;
   data->frame.height = frame.height;
   data->frame.fmt = CnPixelFormat2CnDataFormat(frame.pformat);
-  for(int i = 0; i < data->frame.GetPlanes(); i++) {
+  for (int i = 0; i < data->frame.GetPlanes(); i++) {
     data->frame.stride[i] = frame.strides[i];
-    data->frame.ptr[i] = (void*)frame.data.ptrs[i];
+    data->frame.ptr[i] = (void *)frame.data.ptrs[i];
+  }
+  if (handler_.ReuseCNDecBuf()) {
+    data->frame.deAllocator_ = std::make_shared<CNDeallocator>(instance_, frame.buf_id);
+    if (data->frame.deAllocator_) {
+      reused = true;
+    }
   }
   data->frame.CopyToSyncMem();
-
   handler_.SendData(data);
   return 0;
 }
 
 void FFmpegMluDecoder::FrameCallback(const libstream::CnFrame &frame) {
+  bool reused = false;
   if (frame_count_++ % interval_ == 0) {
-    ProcessFrame(frame);
+    ProcessFrame(frame, reused);
   }
-  instance_->ReleaseBuffer(frame.buf_id);
+  if (!reused) {
+    instance_->ReleaseBuffer(frame.buf_id);
+  }
 }
 
 void FFmpegMluDecoder::EOSCallback() {
@@ -280,8 +296,8 @@ bool FFmpegCpuDecoder::ProcessFrame(AVFrame *frame) {
   auto data = CNFrameInfo::Create(stream_id_);
   if (data == nullptr) {
     ++discard_frame_num_;
-    //LOG(WARNING) << "CNFrameInfo::Create Failed,DISCARD image";
-    if(discard_frame_num_ % 20 == 0) {
+    // LOG(WARNING) << "CNFrameInfo::Create Failed,DISCARD image";
+    if (discard_frame_num_ % 20 == 0) {
       LOG(WARNING) << "CNFrameInfo::Create Failed,DISCARD image: " << discard_frame_num_;
     }
     return false;

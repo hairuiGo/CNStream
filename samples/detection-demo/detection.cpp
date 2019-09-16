@@ -137,7 +137,7 @@ int main(int argc, char** argv) {
       LOG(ERROR) << "Build pipeline failed.";
       return EXIT_FAILURE;
     }
-  } catch (std::string &e) {
+  } catch (std::string& e) {
     LOG(ERROR) << e;
     return EXIT_FAILURE;
   }

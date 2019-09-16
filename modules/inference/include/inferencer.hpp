@@ -35,52 +35,80 @@ CNSTREAM_REGISTER_EXCEPTION(Inferencer);
 
 class InferencerPrivate;
 
+/**
+ * @brief construct a pointer to CNFrameInfo
+ */
 using CNFrameInfoPtr = std::shared_ptr<CNFrameInfo>;
 
-/*********************************************************************************
+/**
  * @brief Inferencer is a module for running offline model inference.
  *
+ * @detail
  * The input could come from Decoder or other plugins, in MLU memory,
- * or CPU memory.
- *
- * Also, if the data shape does not match the model input shape,
+ * or CPU memory. Also, if the data shape does not match the model input shape,
  * before inference it will be resized and converted color space on mlu
  * for MLU memory, and on CPU for CPU memory if CPU preproc set.
  * Afterwards, run infer with offline model loading from model path.
- *********************************************************************************/
+ */
 class Inferencer : public Module, public ModuleCreator<Inferencer> {
  public:
-  /******************************************************************************
+  /**
    * @brief Create Inferencer module
-   ****************************************************************************/
+   *
+   * @param name the Inferencer module's name
+   *
+   * @return None
+   */
   explicit Inferencer(const std::string& name);
+  /**
+   * @brief virtual function do nothing
+   */
   virtual ~Inferencer();
 
-  /*
+  /**
    * @brief Called by pipeline when pipeline start.
-   * @paramSet
-   *   model_path: Offline model path
-   *   func_name: Function name is defined in offline model.
-   *              It could be found in cambricon_twins file.
-   *              For most case, it is "subnet0".
-   *   postproc_name:
-   *   cpu_preproc_name:
-   *   device_id:
-   *   batch_size:  maximum 32, default 1
+   *
+   * @param paramSet:
+   @verbaim
+      model_path: Offline model path
+      func_name: Function name is defined in offline model.
+                 It could be found in cambricon_twins file.
+                 For most case, it is "subnet0".
+      postproc_name:
+      cpu_preproc_name:
+      device_id:
+      batch_size:  maximum 32, default 1
+   @endverbaim
+   *
+   * @return return ture if inferencer open succeed
    */
   bool Open(ModuleParamSet paramSet) override;
-  /*
+  /**
    * @brief Called by pipeline when pipeline stop.
+   *
+   * @param None
+   *
+   * @return void
    */
   void Close() override;
-  /******************************************************************************
+  /**
    * @brief do inference for each frame
-   ****************************************************************************/
+   *
+   * @param data the information and data of frames
+   *
+   * @retval 1: the process success
+   * @retval -1: the process fail
+   */
   int Process(CNFrameInfoPtr data) final;
 
-  /*****************************************************************************
+  /**
    * @brief inferencing by batch
-   *****************************************************************************/
+   *
+   * @param None
+   *
+   * @retval 1: the process success
+   * @retval -1: the process fail
+   */
   int ProcessBatch();
 
  protected:

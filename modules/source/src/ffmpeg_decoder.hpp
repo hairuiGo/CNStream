@@ -60,9 +60,8 @@ class FFmpegDecoder {
     frame_id_ = 0;
     interval_ = interval;
   }
-  uint64_t GetDiscardNum() {
-    return discard_frame_num_;
-  }
+  uint64_t GetDiscardNum() { return discard_frame_num_; }
+
  protected:
   std::string stream_id_;
   DataHandler &handler_;
@@ -87,12 +86,12 @@ class FFmpegMluDecoder : public FFmpegDecoder {
   bool Process(AVPacket *pkt, bool eos) override;
 
  private:
-  libstream::CnDecode *instance_ = nullptr;
+  std::shared_ptr<libstream::CnDecode> instance_ = nullptr;
   libstream::CnPacket cn_packet_;
   std::atomic<int> eos_got_{0};
   void FrameCallback(const libstream::CnFrame &frame);
   void EOSCallback();
-  int ProcessFrame(const libstream::CnFrame &frame);
+  int ProcessFrame(const libstream::CnFrame &frame, bool &reused);
   CNTimer fps_calculators[4];
   void PrintPerformanceInfomation() const {
     printf("stream_id: %s:\n", stream_id_.c_str());
@@ -107,6 +106,21 @@ class FFmpegMluDecoder : public FFmpegDecoder {
     fps_calculators[2].Dot(1.0f * info.total_us / 1000, 1);
     fps_calculators[3].Dot(1);
   }
+
+ private:
+  class CNDeallocator : public cnstream::IDataDeallocator {
+   public:
+    explicit CNDeallocator(std::shared_ptr<libstream::CnDecode> decoder, uint32_t buf_id)
+        : decoder_(decoder), buf_id_(buf_id) {}
+    ~CNDeallocator() {
+      // LOG(INFO) << "Buffer released :" << buf_id_;
+      decoder_->ReleaseBuffer(buf_id_);
+    }
+
+   private:
+    std::shared_ptr<libstream::CnDecode> decoder_;
+    uint32_t buf_id_;
+  };
 };
 
 class FFmpegCpuDecoder : public FFmpegDecoder {

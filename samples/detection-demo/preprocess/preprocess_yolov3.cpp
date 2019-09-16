@@ -22,13 +22,12 @@
 
 #include "preproc.hpp"
 
-
 namespace cnstream {
 
 class PreprocYolov3 : public Preproc, virtual public libstream::ReflexObjectEx<Preproc> {
  public:
   int Execute(const std::vector<float*>& net_inputs, const std::shared_ptr<libstream::ModelLoader>& model,
-    const std::shared_ptr<CNFrameInfo>& package) {
+              const std::shared_ptr<CNFrameInfo>& package) {
     // check params
     auto input_shapes = model->input_shapes();
     if (net_inputs.size() != 1 || input_shapes[0].c() != 3) {
@@ -90,7 +89,7 @@ class PreprocYolov3 : public Preproc, virtual public libstream::ReflexObjectEx<P
       roi.y = (dst.rows - resized.rows) / 2;
       roi.width = resized.cols;
       roi.height = resized.rows;
-    
+
       resized.copyTo(dst(roi));
       img = dst;
     }

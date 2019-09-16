@@ -31,7 +31,7 @@ namespace cnstream {
 
 /*
  *  @brief SourceType
- */ 
+ */
 enum SourceType { SOURCE_RAW, SOURCE_FFMPEG };
 /*
  * @brief OutputType
@@ -49,11 +49,12 @@ struct DataSourceParam {
   OutputType output_type_ = OUTPUT_CPU;    /* output data to cpu/mlu*/
   size_t interval_ = 1;                    /*output image every "interval" frames */
   DecoderType decoder_type_ = DECODER_CPU; /* decoder type*/
+  bool reuse_cndec_buf = false;            /*valid when DECODER_MLU used*/
   int device_id_ = -1;                     /*mlu device id, -1 :disable mlu*/
-  size_t chunk_size_ = 0; /*valid when SOURCE_RAW used, for H264,H265 only*/
-  size_t width_ = 0; /*valid when SOURCE_RAW used, for H264,H265 only*/
-  size_t height_ = 0; /*valid when SOURCE_RAW used, for H264,H265 only*/
-  bool interlaced_ = false; /*valid when SOURCE_RAW used, for H264,H265 only*/
+  size_t chunk_size_ = 0;                  /*valid when SOURCE_RAW used, for H264,H265 only*/
+  size_t width_ = 0;                       /*valid when SOURCE_RAW used, for H264,H265 only*/
+  size_t height_ = 0;                      /*valid when SOURCE_RAW used, for H264,H265 only*/
+  bool interlaced_ = false;                /*valid when SOURCE_RAW used, for H264,H265 only*/
 };
 
 /*
@@ -68,14 +69,14 @@ class DataSource : public Module, public ModuleCreator<DataSource> {
  public:
   /*
    * @brief Construct DataSource object with a given moduleName
-   * @param 
+   * @param
    * 	moduleName[in]:defined module name
-   */  	
+   */
   explicit DataSource(const std::string &moduleName);
   /*
-   * @brief Deconstruct DataSource object 
-   * 	
-   */   
+   * @brief Deconstruct DataSource object
+   *
+   */
   ~DataSource();
 
   /*
@@ -86,6 +87,7 @@ class DataSource : public Module, public ModuleCreator<DataSource> {
    *      "output_type": required, "mlu","cpu"...
    *      "interval": optional, handle data every "interval"
    *      "decoder_type" : required, "mlu","cpu"
+   *      "reuse_cndec_buf": optional when mlu decoder used,"true" or "false".
    *      "device_id": required when "mlu" used, -1 for cpu, 0..N for mlu
    *      "chunk_size": required when source_type is raw"
    *      "width": required when source_type is raw"
@@ -155,13 +157,14 @@ class DataSource : public Module, public ModuleCreator<DataSource> {
   DataSourceParam GetSourceParam() const { return param_; }
 
  private:
- /*
+  /*
    * @hidebrief Remove all streams from DataSource module
    * @param
    * @return
    *    0: success (always success by now)
    */
   int RemoveSources();
+
  private:
   DataSourceParam param_;
   std::mutex mutex_;

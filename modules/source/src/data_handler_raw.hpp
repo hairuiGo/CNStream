@@ -31,15 +31,15 @@ namespace cnstream {
 
 class DataHandlerRaw : public DataHandler {
  public:
-  explicit DataHandlerRaw(DataSource* module, const std::string& stream_id, const std::string& filename,
-                             int framerate, bool loop)
+  explicit DataHandlerRaw(DataSource* module, const std::string& stream_id, const std::string& filename, int framerate,
+                          bool loop)
       : DataHandler(module, stream_id, framerate, loop), filename_(filename) {}
-  ~DataHandlerRaw(){}
+  ~DataHandlerRaw() {}
 
  private:
   std::string filename_;
   RawPacket packet_;
-  uint8_t *chunk_ = nullptr; //for chunk mode
+  uint8_t* chunk_ = nullptr;  // for chunk mode
   size_t chunk_size_ = 0;
   uint64_t pts_ = 0;
   int fd_ = -1;
@@ -49,7 +49,7 @@ class DataHandlerRaw : public DataHandler {
   void ClearResources() override;
   bool Process() override;
   bool Extract();
- 
+
  private:
   std::shared_ptr<RawDecoder> decoder_ = nullptr;
 };

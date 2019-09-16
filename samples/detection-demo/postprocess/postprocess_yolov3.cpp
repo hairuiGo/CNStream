@@ -27,7 +27,7 @@ namespace cnstream {
 class PostprocYolov3 : public Postproc, virtual public libstream::ReflexObjectEx<Postproc> {
  public:
   int Execute(const std::vector<float*>& net_outputs, const std::shared_ptr<libstream::ModelLoader>& model,
-    const std::shared_ptr<CNFrameInfo>& package) {
+              const std::shared_ptr<CNFrameInfo>& package) {
     CHECK_EQ(model->input_num(), 1);
     CHECK_EQ(model->output_num(), 1);
     CHECK_EQ(net_outputs.size(), 1);
@@ -48,9 +48,7 @@ class PostprocYolov3 : public Postproc, virtual public libstream::ReflexObjectEx
     // bboxes
     const int box_num = static_cast<int>(net_output[0]);
     int box_step = 7;
-    auto range_0_1 = [] (float num) {
-      return std::max(.0f, std::min(1.0f, num));
-    };
+    auto range_0_1 = [](float num) { return std::max(.0f, std::min(1.0f, num)); };
     for (int box_idx = 0; box_idx < box_num; ++box_idx) {
       float left = range_0_1(net_output[64 + box_idx * box_step + 3]);
       float right = range_0_1(net_output[64 + box_idx * box_step + 5]);
@@ -66,11 +64,11 @@ class PostprocYolov3 : public Postproc, virtual public libstream::ReflexObjectEx
       right = std::max(0.0f, right);
       top = std::max(0.0f, top);
       bottom = std::max(0.0f, bottom);
-      
+
       auto obj = std::make_shared<CNInferObject>();
       obj->id = std::to_string(static_cast<int>(net_output[64 + box_idx * box_step + 1]));
       obj->score = net_output[64 + box_idx * box_step + 2];
-      
+
       obj->bbox.x = left;
       obj->bbox.y = top;
       obj->bbox.w = std::min(1.0f - obj->bbox.x, right - left);

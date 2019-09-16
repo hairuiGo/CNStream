@@ -61,14 +61,15 @@ class DataHandler {
       send_flow_eos_.store(0);
   }
   void SendFlowEos() {
-    auto data = CNFrameInfo::Create(stream_id_,true);
+    auto data = CNFrameInfo::Create(stream_id_, true);
     data->channel_idx = streamIndex_;
-    LOG(INFO) << "[Source]  " << stream_id_ << " receive eos.";
+    // LOG(INFO) << "[Source]  " << stream_id_ << " receive eos.";
     if (this->module_ && send_flow_eos_.load()) {
       this->module_->SendData(data);
     }
   }
   bool GetDemuxEos() const { return demux_eos_.load() ? true : false; }
+  bool ReuseCNDecBuf() const { return param_.reuse_cndec_buf; }
 
  protected:
   DataSource *module_ = nullptr;

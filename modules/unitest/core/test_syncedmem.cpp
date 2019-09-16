@@ -161,5 +161,5 @@ TEST(CoreSyncedMem, SyncedMem) {
   std::cout << "[Total Test count] [" << total_test_function_number << "]" << std::endl;
 
   t = time(NULL);
-//  std::cout << std::put_time(std::localtime(&t), "%Y-%m-%d %H.%M.%S") << std::endl;
+  //  std::cout << std::put_time(std::localtime(&t), "%Y-%m-%d %H.%M.%S") << std::endl;
 }

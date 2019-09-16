@@ -21,28 +21,38 @@
 #ifndef CNSTREAM_VERSION_HPP_
 #define CNSTREAM_VERSION_HPP_
 
+/**
+ * @file cnstream_version.hpp
+ *
+ * This file contains a declaration of cnstream versions.
+ */
+
 namespace cnstream {
 
 /*************************************************************************
- * @brief get cnstream version string
- * @return version string formatted as "v%major.%minor.%patch"
- *         e.g. "v3.5.1"
+ * Get cnstream version string
+ *
+ * @return Version string formatted as "v%major.%minor.%patch".
+ *         e.g. "v3.5.1".
  ************************************************************************/
 const char* VersionString();
 
 /*************************************************************************
- * @brief get cnstream major version
- * @return major version, [0, MAXINT]
+ * Get cnstream major version.
+ *
+ * @return Major version, [0, MAXINT].
  ************************************************************************/
 const int MajorVersion();
 /*************************************************************************
- * @brief get cnstream minor version
- * @return minor version, [0, MAXINT]
+ * Get cnstream minor version.
+ *
+ * @return Minor version, [0, MAXINT].
  ************************************************************************/
 const int MinorVersion();
 /*************************************************************************
- * @brief get cnstream patch version
- * @return patch version, [0, MAXINT]
+ * Get cnstream patch version.
+ *
+ * @return Patch version, [0, MAXINT].
  ************************************************************************/
 const int PatchVersion();
 

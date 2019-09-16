@@ -28,9 +28,9 @@
 
 #include "cnosd/cnosd.h"
 #ifdef HAVE_OPENCV
- #include "opencv2/opencv.hpp"
+#include "opencv2/opencv.hpp"
 #else
- #error OpenCV required
+#error OpenCV required
 #endif
 
 static std::vector<string> LoadLabels(const std::string& label_path) {

@@ -21,19 +21,31 @@
 #ifndef CNSTREAM_ERROR_HPP_
 #define CNSTREAM_ERROR_HPP_
 
+/**
+ *  \file cnstream_error.hpp
+ *
+ *  This file contains a declaration of class CnstreamError.
+ */
+
 #include <stdexcept>
 #include <string>
 
-/// registor exception class derived from CnstreamError
-#define CNSTREAM_REGISTER_EXCEPTION(CNAME)                         \
-  class CNAME##Error : public cnstream::CnstreamError {            \
-   public:                                                         \
+/**
+ * Registor exception class derived from CnstreamError
+ *
+ * @c CNAME Class name.
+ */
+#define CNSTREAM_REGISTER_EXCEPTION(CNAME)                                \
+  class CNAME##Error : public cnstream::CnstreamError {                   \
+   public:                                                                \
     explicit CNAME##Error(const std::string &msg) : CnstreamError(msg) {} \
   };
 
 namespace cnstream {
 
-/// cnstream base exception class, derived from runtime_error
+/**
+ * Cnstream base exception class, derived from runtime_error.
+ */
 class CnstreamError : public std::runtime_error {
  public:
   explicit CnstreamError(const std::string &msg) : std::runtime_error(msg) {}

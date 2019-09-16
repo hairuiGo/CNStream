@@ -34,7 +34,7 @@ Preproc* Preproc::Create(const std::string& proc_name) {
 IMPLEMENT_REFLEX_OBJECT_EX(PreprocCpu, Preproc)
 
 int PreprocCpu::Execute(const std::vector<float*>& net_inputs, const std::shared_ptr<libstream::ModelLoader>& model,
-    const CNFrameInfoPtr& package) {
+                        const CNFrameInfoPtr& package) {
   // check params
   auto input_shapes = model->input_shapes();
   if (net_inputs.size() != 1 || input_shapes[0].c() != 3) {

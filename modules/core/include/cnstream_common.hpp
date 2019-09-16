@@ -24,15 +24,15 @@
 #include "glog/logging.h"
 
 #define DISABLE_COPY_AND_ASSIGN(TypeName) \
-  TypeName(const TypeName&) = delete;     \
-  const TypeName& operator=(const TypeName&) = delete;
+  TypeName(const TypeName &) = delete;    \
+  const TypeName &operator=(const TypeName &) = delete;
 
-#define DECLARE_PRIVATE(d_ptr, Class)     \
-  friend class Class##Private;            \
+#define DECLARE_PRIVATE(d_ptr, Class) \
+  friend class Class##Private;        \
   Class##Private *d_ptr = nullptr;
 
-#define DECLARE_PUBLIC(q_ptr, Class)    \
-  friend class Class;                   \
+#define DECLARE_PUBLIC(q_ptr, Class) \
+  friend class Class;                \
   Class *q_ptr = nullptr;
 
 #define UNSUPPORTED LOG(FATAL) << "Not supported";

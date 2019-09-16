@@ -41,19 +41,19 @@ CNDataFrame::~CNDataFrame() {
   }
 #ifdef HAVE_OPENCV
   if (nullptr != bgr_mat) {
-    delete bgr_mat,bgr_mat = nullptr;
+    delete bgr_mat, bgr_mat = nullptr;
   }
 #endif
 }
 
 #ifdef HAVE_OPENCV
-cv::Mat *CNDataFrame::ImageBGR() {
-  if(bgr_mat != nullptr) {
+cv::Mat* CNDataFrame::ImageBGR() {
+  if (bgr_mat != nullptr) {
     return bgr_mat;
   }
   int stride_ = stride[0];
   cv::Mat bgr(height, stride_, CV_8UC3);
-  uint8_t *img_data = new uint8_t[GetBytes()];
+  uint8_t* img_data = new uint8_t[GetBytes()];
   uint8_t* t = img_data;
   for (int i = 0; i < GetPlanes(); ++i) {
     memcpy(t, data[i]->GetCpuData(), GetPlaneBytes(i));
@@ -81,9 +81,9 @@ cv::Mat *CNDataFrame::ImageBGR() {
       return nullptr;
     }
   }
-	delete[] img_data;
+  delete[] img_data;
   bgr_mat = new cv::Mat();
-  if(bgr_mat) {
+  if (bgr_mat) {
     *bgr_mat = bgr;
   }
   return bgr_mat;
@@ -120,9 +120,9 @@ size_t CNDataFrame::GetBytes() const {
 }
 
 void CNDataFrame::CopyToSyncMem() {
-  if(this->deAllocator_ != nullptr) {
+  if (this->deAllocator_ != nullptr) {
     /*cndecoder buffer will be used to avoid dev2dev copy*/
-    for(int i = 0; i < GetPlanes(); i++) {
+    for (int i = 0; i < GetPlanes(); i++) {
       size_t plane_size = GetPlaneBytes(i);
       this->data[i].reset(new CNSyncedMemory(plane_size, ctx.dev_id, ctx.ddr_channel));
       this->data[i]->SetMluData(this->ptr[i]);
@@ -130,33 +130,34 @@ void CNDataFrame::CopyToSyncMem() {
     return;
   }
   /*deep copy*/
-  if(this->ctx.dev_type == DevContext::MLU) {
-    if(mlu_data != nullptr) {
+  if (this->ctx.dev_type == DevContext::MLU) {
+    if (mlu_data != nullptr) {
       LOG(FATAL) << "CopyToSyncMem should be called once for each frame";
     }
     size_t bytes = GetBytes();
     bytes = ROUND_UP(bytes, 64 * 1024);
     CALL_CNRT_BY_CONTEXT(cnrtMalloc(&mlu_data, bytes), ctx.dev_id, ctx.ddr_channel);
     void* dst = mlu_data;
-    for(int i = 0; i < GetPlanes(); i++) {
+    for (int i = 0; i < GetPlanes(); i++) {
       size_t plane_size = GetPlaneBytes(i);
-      CALL_CNRT_BY_CONTEXT(cnrtMemcpy(dst, ptr[i], plane_size, CNRT_MEM_TRANS_DIR_DEV2DEV), ctx.dev_id, ctx.ddr_channel);
+      CALL_CNRT_BY_CONTEXT(cnrtMemcpy(dst, ptr[i], plane_size, CNRT_MEM_TRANS_DIR_DEV2DEV), ctx.dev_id,
+                           ctx.ddr_channel);
       this->data[i].reset(new CNSyncedMemory(plane_size, ctx.dev_id, ctx.ddr_channel));
       this->data[i]->SetMluData(dst);
       dst = (void*)((uint8_t*)dst + plane_size);
     }
-  } else if(this->ctx.dev_type == DevContext::CPU) {
-    if(cpu_data != nullptr) {
+  } else if (this->ctx.dev_type == DevContext::CPU) {
+    if (cpu_data != nullptr) {
       LOG(FATAL) << "CopyToSyncMem should be called once for each frame";
     }
     size_t bytes = GetBytes();
     bytes = ROUND_UP(bytes, 64 * 1024);
     CNStreamMallocHost(&cpu_data, bytes);
-    if(nullptr == cpu_data) {
+    if (nullptr == cpu_data) {
       LOG(FATAL) << "CopyToSyncMem: failed to alloc cpu memory";
     }
     void* dst = cpu_data;
-    for(int i = 0; i < GetPlanes(); i++) {
+    for (int i = 0; i < GetPlanes(); i++) {
       size_t plane_size = GetPlaneBytes(i);
       memcpy(dst, ptr[i], plane_size);
       this->data[i].reset(new CNSyncedMemory(plane_size));
@@ -258,7 +259,7 @@ std::shared_ptr<CNFrameInfo> CNFrameInfo::Create(const std::string& stream_id, b
   }
   frameInfo->frame.stream_id = stream_id;
   std::shared_ptr<CNFrameInfo> ptr(frameInfo);
-  if(eos) {
+  if (eos) {
     ptr->frame.flags |= cnstream::CN_FRAME_FLAG_EOS;
     return ptr;
   }
@@ -283,7 +284,7 @@ std::shared_ptr<CNFrameInfo> CNFrameInfo::Create(const std::string& stream_id, b
 }
 
 CNFrameInfo::~CNFrameInfo() {
-  if(frame.flags & CN_FRAME_FLAG_EOS) {
+  if (frame.flags & CN_FRAME_FLAG_EOS) {
     return;
   }
   if (frame.ctx.dev_type == DevContext::INVALID) {

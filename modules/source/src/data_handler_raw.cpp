@@ -18,14 +18,14 @@
  * THE SOFTWARE.
  *************************************************************************/
 #include "data_handler_raw.hpp"
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 #include <future>
 #include <sstream>
 #include <thread>
 #include <utility>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
 #include "cninfer/mlu_context.h"
 namespace cnstream {
 
@@ -35,16 +35,16 @@ namespace cnstream {
 #endif
 
 bool DataHandlerRaw::PrepareResources() {
-  fd_ = open(filename_.c_str(),O_RDONLY);
-  if(fd_ < 0) {
+  fd_ = open(filename_.c_str(), O_RDONLY);
+  if (fd_ < 0) {
     LOG(ERROR) << "Failed to open file: " << filename_;
     return false;
   }
 
-  if(param_.chunk_size_) {
-    if(chunk_) delete []chunk_;
+  if (param_.chunk_size_) {
+    if (chunk_) delete[] chunk_;
     chunk_ = new uint8_t[param_.chunk_size_];
-    if(nullptr == chunk_) {
+    if (nullptr == chunk_) {
       LOG(ERROR) << "Failed to alloc memory";
       return false;
     }
@@ -68,14 +68,14 @@ bool DataHandlerRaw::PrepareResources() {
   }
   if (decoder_.get()) {
     DecoderContext ctx;
-    //FIXME, parse bitstream to get decoder parametesrs...
-    if(filename_.find(".h264") != std::string::npos || filename_.find(".264") != std::string::npos) {
+    // FIXME, parse bitstream to get decoder parametesrs...
+    if (filename_.find(".h264") != std::string::npos || filename_.find(".264") != std::string::npos) {
       ctx.codec_id = DecoderContext::CN_CODEC_ID_H264;
-    } else if(filename_.find(".h265") != std::string::npos) {
+    } else if (filename_.find(".h265") != std::string::npos) {
       ctx.codec_id = DecoderContext::CN_CODEC_ID_HEVC;
-    /*} else if(filename_.find(".jpg") != std::string::npos) {
-      ctx.codec_id = DecoderContext::CN_CODEC_ID_JPEG;
-    */
+      /*} else if(filename_.find(".jpg") != std::string::npos) {
+        ctx.codec_id = DecoderContext::CN_CODEC_ID_JPEG;
+      */
     } else {
       LOG(ERROR) << "unsupported raw file format";
       return false;
@@ -88,14 +88,14 @@ bool DataHandlerRaw::PrepareResources() {
     bool ret = decoder_->Create(&ctx);
     if (ret) {
       decoder_->ResetCount(this->interval_);
-    #ifdef CNS_MLU100
+#ifdef CNS_MLU100
       /*MLU100 does not have chunk-mode, use stream-mode instead*/
-      if( param_.chunk_size_ <= ctx.width * ctx.height * 3/4) {
+      if (param_.chunk_size_ <= ctx.width * ctx.height * 3 / 4) {
         chunk_size_ = param_.chunk_size_;
       } else {
-        chunk_size_ = ctx.width * ctx.height * 3/4;
+        chunk_size_ = ctx.width * ctx.height * 3 / 4;
       }
-    #endif
+#endif
       return true;
     }
     return false;
@@ -108,21 +108,20 @@ void DataHandlerRaw::ClearResources() {
     EnableFlowEos(true);
     decoder_->Destroy();
   }
-  if(fd_ > 0) {
-    close(fd_),fd_ = -1;
+  if (fd_ > 0) {
+    close(fd_), fd_ = -1;
   }
-  if(chunk_){
-    delete []chunk_,chunk_ = nullptr;
+  if (chunk_) {
+    delete[] chunk_, chunk_ = nullptr;
   }
 }
 
-
 bool DataHandlerRaw::Extract() {
-  if(chunk_size_ > 0) {
+  if (chunk_size_ > 0) {
     /*chunk mode*/
-    ssize_t len = read(fd_,chunk_,chunk_size_);
-    if(len <= 0){
-      //EOF reached
+    ssize_t len = read(fd_, chunk_, chunk_size_);
+    if (len <= 0) {
+      // EOF reached
       packet_.data = nullptr;
       packet_.size = 0;
       packet_.pts = 0;
